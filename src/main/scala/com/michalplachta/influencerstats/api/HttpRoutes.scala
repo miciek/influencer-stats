@@ -11,9 +11,33 @@ import scala.concurrent.Future
 
 object HttpRoutes extends Directives {
   def getInfluencerResults(getResults: UUID => Future[InfluencerResults]): Route = {
-    path("stats" / JavaUUID) { collectionId =>
+    path("collections" / JavaUUID / "stats") { collectionId =>
       get {
         complete((StatusCodes.OK, getResults(collectionId)))
+      }
+    }
+  }
+
+  def putCollection(saveCollection: (UUID, Collection) => Unit): Route = {
+    path("collections" / JavaUUID) { collectionId =>
+      put {
+        entity(as[Collection]) { collection =>
+          saveCollection(collectionId, collection)
+          complete(StatusCodes.Created)
+        }
+      }
+    }
+  }
+
+  def getCollection(getCollection: UUID => Option[Collection]): Route = {
+    path("collections" / JavaUUID) { collectionId =>
+      get {
+        getCollection(collectionId) match {
+          case Some(collection) =>
+            complete((StatusCodes.OK, collection))
+          case None =>
+            complete(StatusCodes.NotFound)
+        }
       }
     }
   }
