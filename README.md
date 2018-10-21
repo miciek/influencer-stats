@@ -60,6 +60,17 @@ Requests/sec:   5804.37
 Transfer/sec:      0.98MB
 ```
 
+### Flamegraph generation
+To compare different versions, we will use [flamegraphs](http://www.brendangregg.com/flamegraphs.html). The command below generates flamegraph for the load-tested application:
+
+```
+jps # to get the <PID> of the application
+cd async-profiler
+./profiler.sh -d 30 -f /tmp/flamegraph.svg <PID>
+```
+
+Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
+
 ### Version 1
 ```
 > wrk -t1 -c1 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
