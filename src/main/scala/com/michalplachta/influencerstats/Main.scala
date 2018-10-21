@@ -1,21 +1,20 @@
 package com.michalplachta.influencerstats
 import java.util.UUID
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.server.{HttpApp, Route}
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
+import cats.effect.IO
 import com.michalplachta.influencerstats.api.{youtube, Collection, HttpRoutes}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
 import com.typesafe.config.ConfigFactory
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
+import hammock.jvm.Interpreter
+import hammock._
 import io.circe.generic.auto._
+import hammock.circe.implicits._
+
+import cats.implicits._
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.Future
 
 object Main extends App {
   val config        = ConfigFactory.load()
@@ -24,23 +23,24 @@ object Main extends App {
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
-  implicit val system = ActorSystem("influencer-stats")
-  implicit val ec     = system.dispatcher
-
   val state = TrieMap.empty[UUID, Collection]
 
-  def getInfluencerResults(id: UUID): Future[InfluencerResults] = {
-    implicit val materializer = ActorMaterializer()
+  def getInfluencerResults(id: UUID): IO[InfluencerResults] = {
+    implicit val interpreter = Interpreter[IO]
 
-    val youtubeResponses: List[Future[youtube.VideoListResponse]] =
-      state.mapValues(_.videos).getOrElse(id, List.empty).map { videoId =>
-        Http()
-          .singleRequest(HttpRequest(uri = s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey"))
-          .flatMap(Unmarshal(_).to[youtube.VideoListResponse])
-      }
+    val youtubeResponses: IO[List[youtube.VideoListResponse]] =
+      state
+        .mapValues(_.videos)
+        .getOrElse(id, List.empty)
+        .map { videoId =>
+          Hammock
+            .request(Method.GET, uri"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey", Map.empty)
+            .as[youtube.VideoListResponse]
+            .exec[IO]
+        }
+        .sequence
 
-    Future
-      .sequence(youtubeResponses)
+    youtubeResponses
       .map(_.flatMap(_.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))))
       .map(Statistics.calculate)
   }
@@ -53,5 +53,5 @@ object Main extends App {
         HttpRoutes.putCollection(state.put)
       )
   }
-  httpApp.startServer(host, port, system)
+  httpApp.startServer(host, port)
 }

@@ -90,3 +90,20 @@ Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea9
 Requests/sec:    733.20
 Transfer/sec:    136.04KB
 ```
+### Version 2
+```
+> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  1 threads and 1 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     1.66ms  595.48us  30.56ms   95.45%
+    Req/Sec   610.99     42.68   696.00     77.67%
+  Latency Distribution
+     50%    1.58ms
+     75%    1.66ms
+     90%    1.82ms
+     99%    2.83ms
+  36501 requests in 1.00m, 6.61MB read
+Requests/sec:    608.10
+Transfer/sec:    112.83KB
+```

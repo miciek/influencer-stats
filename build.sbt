@@ -10,6 +10,8 @@ lazy val root = (project in file("."))
       "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.+",
       "io.circe"          %% "circe-generic"        % "0.10.+",
       "io.circe"          %% "circe-parser"         % "0.10.+",
+      "com.pepegar"       %% "hammock-core"         % "0.8.6",
+      "com.pepegar"       %% "hammock-circe"        % "0.8.6",
       "de.heikoseeberger" %% "akka-http-circe"      % "1.22.+",
       "org.scalatest"     %% "scalatest"            % "3.0.+" % Test,
       "com.typesafe.akka" %% "akka-http-testkit"    % "10.1.+" % Test
