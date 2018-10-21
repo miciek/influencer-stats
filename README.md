@@ -20,7 +20,9 @@ curl localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
 ```
 
 ## Performance tests
-To run performance tests, you will need [wrk](https://github.com/wg/wrk). Before starting, let's first establish the performance of our YouTube mock server:
+To run performance tests, you will need [wrk](https://github.com/wg/wrk). To analyse what's going on inside the application, please install [async-profiler](https://github.com/jvm-profiling-tools/async-profiler).
+
+Before starting, let's first establish the performance of our YouTube mock server:
 
 ```
 > wrk -t1 -c1 -d30s --latency http://localhost:8081/youtube/v3/videos
