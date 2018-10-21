@@ -60,8 +60,10 @@ Requests/sec:   5804.37
 Transfer/sec:      0.98MB
 ```
 
+Remember that each test should be run several times to warm up JVM.
+
 ### Flamegraph generation
-To compare different versions, we will use [flamegraphs](http://www.brendangregg.com/flamegraphs.html). The command below generates flamegraph for the load-tested application:
+To compare different versions, we will use [flamegraphs](http://www.brendangregg.com/flamegraphs.html). The command below generates flamegraph for the load-tested application (should be started after around 15s of `wrk`):
 
 ```
 jps # to get the <PID> of the application
@@ -73,18 +75,18 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
 ### Version 1
 ```
-> wrk -t1 -c1 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
   1 threads and 1 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     3.42ms    9.64ms 127.42ms   93.03%
-    Req/Sec     0.88k   192.91     1.29k    77.26%
+    Latency     2.35ms    5.18ms 124.55ms   93.29%
+    Req/Sec   736.72    127.18     1.00k    72.00%
   Latency Distribution
-     50%    0.89ms
-     75%    1.20ms
-     90%    8.88ms
-     99%   50.33ms
-  26174 requests in 30.03s, 4.74MB read
-Requests/sec:    871.65
-Transfer/sec:    161.73KB
+     50%    1.15ms
+     75%    1.35ms
+     90%    3.47ms
+     99%   18.98ms
+  44032 requests in 1.00m, 7.98MB read
+Requests/sec:    733.20
+Transfer/sec:    136.04KB
 ```
