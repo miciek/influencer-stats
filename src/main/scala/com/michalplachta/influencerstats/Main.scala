@@ -1,15 +1,16 @@
 package com.michalplachta.influencerstats
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Sync}
+import cats.implicits._
 import com.michalplachta.influencerstats.api.{youtube, Collection, HttpService}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
 import com.typesafe.config.ConfigFactory
-import hammock.jvm.Interpreter
-import hammock._
+import io.circe.Decoder
 import io.circe.generic.auto._
-import hammock.circe.implicits._
-import cats.implicits._
+import org.http4s.EntityDecoder
+import org.http4s.circe._
+import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.server.blaze.BlazeBuilder
 
 import scala.collection.concurrent.TrieMap
@@ -22,19 +23,19 @@ object Main extends IOApp {
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
   val state = TrieMap.empty[String, Collection]
+  val ec    = scala.concurrent.ExecutionContext.global
 
   def getInfluencerResults(id: String): IO[InfluencerResults] = {
-    implicit val interpreter = Interpreter[IO]
+    implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
 
     val youtubeResponses: IO[List[youtube.VideoListResponse]] =
       state
         .mapValues(_.videos)
         .getOrElse(id, List.empty)
         .map { videoId =>
-          Hammock
-            .request(Method.GET, uri"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey", Map.empty)
-            .as[youtube.VideoListResponse]
-            .exec[IO]
+          BlazeClientBuilder[IO](ec).resource.use { client =>
+            client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
+          }
         }
         .sequence
 
