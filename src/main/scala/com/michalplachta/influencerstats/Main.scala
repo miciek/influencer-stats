@@ -1,9 +1,7 @@
 package com.michalplachta.influencerstats
-import java.util.UUID
 
-import akka.http.scaladsl.server.{HttpApp, Route}
-import cats.effect.IO
-import com.michalplachta.influencerstats.api.{youtube, Collection, HttpRoutes}
+import cats.effect.{ExitCode, IO, IOApp}
+import com.michalplachta.influencerstats.api.{youtube, Collection, HttpService}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
 import com.typesafe.config.ConfigFactory
@@ -11,21 +9,21 @@ import hammock.jvm.Interpreter
 import hammock._
 import io.circe.generic.auto._
 import hammock.circe.implicits._
-
 import cats.implicits._
+import org.http4s.server.blaze.BlazeBuilder
 
 import scala.collection.concurrent.TrieMap
 
-object Main extends App {
+object Main extends IOApp {
   val config        = ConfigFactory.load()
   val host          = config.getString("app.host")
   val port          = config.getInt("app.port")
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
-  val state = TrieMap.empty[UUID, Collection]
+  val state = TrieMap.empty[String, Collection]
 
-  def getInfluencerResults(id: UUID): IO[InfluencerResults] = {
+  def getInfluencerResults(id: String): IO[InfluencerResults] = {
     implicit val interpreter = Interpreter[IO]
 
     val youtubeResponses: IO[List[youtube.VideoListResponse]] =
@@ -45,13 +43,14 @@ object Main extends App {
       .map(Statistics.calculate)
   }
 
-  val httpApp = new HttpApp {
-    override protected def routes: Route =
-      Route.seal(
-        HttpRoutes.getInfluencerResults(getInfluencerResults) ~
-        HttpRoutes.getCollection(state.get) ~
-        HttpRoutes.putCollection(state.put)
-      )
-  }
-  httpApp.startServer(host, port)
+  val service = new HttpService(getInfluencerResults, state.get, state.put)
+
+  override def run(args: List[String]): IO[ExitCode] =
+    BlazeBuilder[IO]
+      .bindHttp(port, host)
+      .mountService(service.routes, "/")
+      .serve
+      .compile
+      .drain
+      .as(ExitCode.Success)
 }

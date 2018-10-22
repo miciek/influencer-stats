@@ -73,7 +73,7 @@ cd async-profiler
 
 Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
-### Version 1
+### Version 1 (akka-http server/client + Futures)
 ```
 > wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
 Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
@@ -90,7 +90,7 @@ Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea9
 Requests/sec:    733.20
 Transfer/sec:    136.04KB
 ```
-### Version 2
+### Version 2 (akka-http/Hammock + IO)
 ```
 > wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
 Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
@@ -106,4 +106,22 @@ Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea9
   36501 requests in 1.00m, 6.61MB read
 Requests/sec:    608.10
 Transfer/sec:    112.83KB
+```
+
+### Version 3 (http4s/Hammock + IO)
+```
+> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  1 threads and 1 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     1.64ms  372.82us  16.55ms   93.89%
+    Req/Sec   614.36     36.72   666.00     90.00%
+  Latency Distribution
+     50%    1.56ms
+     75%    1.64ms
+     90%    1.80ms
+     99%    2.83ms
+  36693 requests in 1.00m, 5.74MB read
+Requests/sec:    611.32
+Transfer/sec:     97.91KB
 ```

@@ -1,0 +1,2683 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="1206" onload="init(evt)" viewBox="0 0 1200 1206" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:black; }
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0" y="0" width="100%" height="100%" fill="rgb(240,240,220)"/>
+<text x="600" y="24" text-anchor="middle" style="font-size:17px">Flame Graph</text>
+<text x="10" y="1189" id="details"> </text>
+<text x="10" y="24" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer">Reset Zoom</text>
+<text x="1090" y="24" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer">Search</text>
+<text x="1090" y="1189" id="matched"> </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (1,302 samples, 100.00%)</title><rect x="10.0" y="1155.0" width="1180.0" height="15" fill="#c83232" rx="2" ry="2"/>
+<text x="13.0" y="1166.0">all</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Thread.run (114 samples, 8.76%)</title><rect x="10.0" y="1139.0" width="103.3" height="15" fill="#39cf39" rx="2" ry="2"/>
+<text x="13.0" y="1150.0">java/lang/Th..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor$Worker.run (6 samples, 0.46%)</title><rect x="10.0" y="1123.0" width="5.4" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="13.0" y="1134.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.runWorker (6 samples, 0.46%)</title><rect x="10.0" y="1107.0" width="5.4" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="13.0" y="1118.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/lmax/disruptor/BatchEventProcessor.run (6 samples, 0.46%)</title><rect x="10.0" y="1091.0" width="5.4" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="13.0" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/lmax/disruptor/ProcessingSequenceBarrier.waitFor (6 samples, 0.46%)</title><rect x="10.0" y="1075.0" width="5.4" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="13.0" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/lmax/disruptor/TimeoutBlockingWaitStrategy.waitFor (6 samples, 0.46%)</title><rect x="10.0" y="1059.0" width="5.4" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="13.0" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.awaitNanos (6 samples, 0.46%)</title><rect x="10.0" y="1043.0" width="5.4" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="13.0" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.parkNanos (6 samples, 0.46%)</title><rect x="10.0" y="1027.0" width="5.4" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="13.0" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.park (6 samples, 0.46%)</title><rect x="10.0" y="1011.0" width="5.4" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="13.0" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop$$anon$1.run (108 samples, 8.29%)</title><rect x="15.4" y="1123.0" width="97.9" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="18.4" y="1134.0">org/http4s/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.org$http4s$blaze$channel$nio1$SelectorLoop$$runLoop (108 samples, 8.29%)</title><rect x="15.4" y="1107.0" width="97.9" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="18.4" y="1118.0">org/http4s/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/TaskQueue.executeTasks (73 samples, 5.61%)</title><rect x="15.4" y="1091.0" width="66.2" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="18.4" y="1102.0">org/htt..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/TaskQueue.go$1 (73 samples, 5.61%)</title><rect x="15.4" y="1075.0" width="66.2" height="15" fill="#34c934" rx="2" ry="2"/>
+<text x="18.4" y="1086.0">org/htt..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop$LoopRunnable.run (73 samples, 5.61%)</title><rect x="15.4" y="1059.0" width="66.2" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="18.4" y="1070.0">org/htt..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage$$anon$1.run (20 samples, 1.54%)</title><rect x="15.4" y="1043.0" width="18.2" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="18.4" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.success (19 samples, 1.46%)</title><rect x="16.3" y="1027.0" width="17.3" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="19.3" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.success$ (19 samples, 1.46%)</title><rect x="16.3" y="1011.0" width="17.3" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="19.3" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.success (19 samples, 1.46%)</title><rect x="16.3" y="995.0" width="17.3" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="19.3" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.complete (19 samples, 1.46%)</title><rect x="16.3" y="979.0" width="17.3" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="19.3" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete$ (19 samples, 1.46%)</title><rect x="16.3" y="963.0" width="17.3" height="15" fill="#4bde4b" rx="2" ry="2"/>
+<text x="19.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete (19 samples, 1.46%)</title><rect x="16.3" y="947.0" width="17.3" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="19.3" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.tryComplete (19 samples, 1.46%)</title><rect x="16.3" y="931.0" width="17.3" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="19.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1$adapted (19 samples, 1.46%)</title><rect x="16.3" y="915.0" width="17.3" height="15" fill="#69fb69" rx="2" ry="2"/>
+<text x="19.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1 (19 samples, 1.46%)</title><rect x="16.3" y="899.0" width="17.3" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="19.3" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (19 samples, 1.46%)</title><rect x="16.3" y="883.0" width="17.3" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="19.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$$anon$2.execute (19 samples, 1.46%)</title><rect x="16.3" y="867.0" width="17.3" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="19.3" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$ThreadLocalTrampoline.execute (19 samples, 1.46%)</title><rect x="16.3" y="851.0" width="17.3" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="19.3" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$ThreadLocalTrampoline.run (19 samples, 1.46%)</title><rect x="16.3" y="835.0" width="17.3" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="19.3" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.run (19 samples, 1.46%)</title><rect x="16.3" y="819.0" width="17.3" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="19.3" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$Lambda$3147/951083412.apply (19 samples, 1.46%)</title><rect x="16.3" y="803.0" width="17.3" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="19.3" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$handleReqRead$1$adapted (19 samples, 1.46%)</title><rect x="16.3" y="787.0" width="17.3" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="19.3" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$handleReqRead$1 (19 samples, 1.46%)</title><rect x="16.3" y="771.0" width="17.3" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="19.3" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.reqLoopCallback (19 samples, 1.46%)</title><rect x="16.3" y="755.0" width="17.3" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="19.3" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.liftedTree1$1 (19 samples, 1.46%)</title><rect x="16.3" y="739.0" width="17.3" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="19.3" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.runRequest (19 samples, 1.46%)</title><rect x="16.3" y="723.0" width="17.3" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="19.3" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (19 samples, 1.46%)</title><rect x="16.3" y="707.0" width="17.3" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="19.3" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (19 samples, 1.46%)</title><rect x="16.3" y="691.0" width="17.3" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="19.3" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (19 samples, 1.46%)</title><rect x="16.3" y="675.0" width="17.3" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="19.3" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (19 samples, 1.46%)</title><rect x="16.3" y="659.0" width="17.3" height="15" fill="#47dc47" rx="2" ry="2"/>
+<text x="19.3" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (19 samples, 1.46%)</title><rect x="16.3" y="643.0" width="17.3" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="19.3" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage$$anon$2.run (53 samples, 4.07%)</title><rect x="33.6" y="1043.0" width="48.0" height="15" fill="#6cfe6c" rx="2" ry="2"/>
+<text x="36.6" y="1054.0">org/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage$.org$http4s$blaze$channel$nio1$NIO1HeadStage$$performWrite (7 samples, 0.54%)</title><rect x="33.6" y="1027.0" width="6.3" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="36.6" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage$.writeLoop$1 (7 samples, 0.54%)</title><rect x="33.6" y="1011.0" width="6.3" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="36.6" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketChannelImpl.write (7 samples, 0.54%)</title><rect x="33.6" y="995.0" width="6.3" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="36.6" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.write (7 samples, 0.54%)</title><rect x="33.6" y="979.0" width="6.3" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="36.6" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.writeFromNativeBuffer (7 samples, 0.54%)</title><rect x="33.6" y="963.0" width="6.3" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="36.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketDispatcher.write (7 samples, 0.54%)</title><rect x="33.6" y="947.0" width="6.3" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="36.6" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/FileDispatcherImpl.write0 (7 samples, 0.54%)</title><rect x="33.6" y="931.0" width="6.3" height="15" fill="#42d642" rx="2" ry="2"/>
+<text x="36.6" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.complete (9 samples, 0.69%)</title><rect x="39.9" y="1027.0" width="8.2" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="42.9" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete$ (9 samples, 0.69%)</title><rect x="39.9" y="1011.0" width="8.2" height="15" fill="#5ff25f" rx="2" ry="2"/>
+<text x="42.9" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete (9 samples, 0.69%)</title><rect x="39.9" y="995.0" width="8.2" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="42.9" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.tryComplete (9 samples, 0.69%)</title><rect x="39.9" y="979.0" width="8.2" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="42.9" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1$adapted (9 samples, 0.69%)</title><rect x="39.9" y="963.0" width="8.2" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="42.9" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1 (9 samples, 0.69%)</title><rect x="39.9" y="947.0" width="8.2" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="42.9" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (9 samples, 0.69%)</title><rect x="39.9" y="931.0" width="8.2" height="15" fill="#3bd13b" rx="2" ry="2"/>
+<text x="42.9" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (9 samples, 0.69%)</title><rect x="39.9" y="915.0" width="8.2" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="42.9" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (9 samples, 0.69%)</title><rect x="39.9" y="899.0" width="8.2" height="15" fill="#67f967" rx="2" ry="2"/>
+<text x="42.9" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (9 samples, 0.69%)</title><rect x="39.9" y="883.0" width="8.2" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="42.9" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (9 samples, 0.69%)</title><rect x="39.9" y="867.0" width="8.2" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="42.9" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (9 samples, 0.69%)</title><rect x="39.9" y="851.0" width="8.2" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="42.9" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.tryComplete (37 samples, 2.84%)</title><rect x="48.1" y="1027.0" width="33.5" height="15" fill="#50e350" rx="2" ry="2"/>
+<text x="51.1" y="1038.0">sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1$adapted (37 samples, 2.84%)</title><rect x="48.1" y="1011.0" width="33.5" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="51.1" y="1022.0">sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1 (37 samples, 2.84%)</title><rect x="48.1" y="995.0" width="33.5" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="51.1" y="1006.0">sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (37 samples, 2.84%)</title><rect x="48.1" y="979.0" width="33.5" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="51.1" y="990.0">sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (37 samples, 2.84%)</title><rect x="48.1" y="963.0" width="33.5" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="51.1" y="974.0">sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (37 samples, 2.84%)</title><rect x="48.1" y="947.0" width="33.5" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="51.1" y="958.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (37 samples, 2.84%)</title><rect x="48.1" y="931.0" width="33.5" height="15" fill="#37cc37" rx="2" ry="2"/>
+<text x="51.1" y="942.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (37 samples, 2.84%)</title><rect x="48.1" y="915.0" width="33.5" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="51.1" y="926.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (37 samples, 2.84%)</title><rect x="48.1" y="899.0" width="33.5" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="51.1" y="910.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SelectorImpl.select (35 samples, 2.69%)</title><rect x="81.6" y="1091.0" width="31.7" height="15" fill="#50e350" rx="2" ry="2"/>
+<text x="84.6" y="1102.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SelectorImpl.select (35 samples, 2.69%)</title><rect x="81.6" y="1075.0" width="31.7" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="84.6" y="1086.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SelectorImpl.lockAndDoSelect (35 samples, 2.69%)</title><rect x="81.6" y="1059.0" width="31.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="84.6" y="1070.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueSelectorImpl.doSelect (35 samples, 2.69%)</title><rect x="81.6" y="1043.0" width="31.7" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="84.6" y="1054.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.poll (33 samples, 2.53%)</title><rect x="81.6" y="1027.0" width="29.9" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="84.6" y="1038.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.kevent0 (33 samples, 2.53%)</title><rect x="81.6" y="1011.0" width="29.9" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="84.6" y="1022.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueSelectorImpl.updateSelectedKeys (2 samples, 0.15%)</title><rect x="111.5" y="1027.0" width="1.8" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="114.5" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.drain (2 samples, 0.15%)</title><rect x="111.5" y="1011.0" width="1.8" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="114.5" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinWorkerThread.run (1,187 samples, 91.17%)</title><rect x="113.3" y="1139.0" width="1075.8" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="116.3" y="1150.0">java/util/concurrent/ForkJoinWorkerThread.run</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.runWorker (1,187 samples, 91.17%)</title><rect x="113.3" y="1123.0" width="1075.8" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="116.3" y="1134.0">java/util/concurrent/ForkJoinPool.runWorker</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool$WorkQueue.runTask (1,099 samples, 84.41%)</title><rect x="113.3" y="1107.0" width="996.0" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="116.3" y="1118.0">java/util/concurrent/ForkJoinPool$WorkQueue.runTask</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinTask.doExec (1,099 samples, 84.41%)</title><rect x="113.3" y="1091.0" width="996.0" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="116.3" y="1102.0">java/util/concurrent/ForkJoinTask.doExec</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinTask$RunnableExecuteAction.exec (1,099 samples, 84.41%)</title><rect x="113.3" y="1075.0" width="996.0" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="116.3" y="1086.0">java/util/concurrent/ForkJoinTask$RunnableExecuteAction.exec</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/Async$$anon$7.run (9 samples, 0.69%)</title><rect x="113.3" y="1059.0" width="8.2" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="116.3" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.apply (9 samples, 0.69%)</title><rect x="113.3" y="1043.0" width="8.2" height="15" fill="#66f766" rx="2" ry="2"/>
+<text x="116.3" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.apply (9 samples, 0.69%)</title><rect x="113.3" y="1027.0" width="8.2" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="116.3" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC.execute (9 samples, 0.69%)</title><rect x="113.3" y="1011.0" width="8.2" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="116.3" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.execute (9 samples, 0.69%)</title><rect x="113.3" y="995.0" width="8.2" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="116.3" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.startLoop (9 samples, 0.69%)</title><rect x="113.3" y="979.0" width="8.2" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="116.3" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/BlockContext$.withBlockContext (9 samples, 0.69%)</title><rect x="113.3" y="963.0" width="8.2" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="116.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (9 samples, 0.69%)</title><rect x="113.3" y="947.0" width="8.2" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="116.3" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline$$Lambda$3012/344338007.apply$mcV$sp (9 samples, 0.69%)</title><rect x="113.3" y="931.0" width="8.2" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="116.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.$anonfun$startLoop$1 (9 samples, 0.69%)</title><rect x="113.3" y="915.0" width="8.2" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="116.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.super$startLoop (9 samples, 0.69%)</title><rect x="113.3" y="899.0" width="8.2" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="116.3" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.startLoop (9 samples, 0.69%)</title><rect x="113.3" y="883.0" width="8.2" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="116.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.cats$effect$internals$Trampoline$$immediateLoop (9 samples, 0.69%)</title><rect x="113.3" y="867.0" width="8.2" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="116.3" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.run (9 samples, 0.69%)</title><rect x="113.3" y="851.0" width="8.2" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="116.3" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (9 samples, 0.69%)</title><rect x="113.3" y="835.0" width="8.2" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="116.3" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (9 samples, 0.69%)</title><rect x="113.3" y="819.0" width="8.2" height="15" fill="#42d642" rx="2" ry="2"/>
+<text x="116.3" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.signal (9 samples, 0.69%)</title><rect x="113.3" y="803.0" width="8.2" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="116.3" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (9 samples, 0.69%)</title><rect x="113.3" y="787.0" width="8.2" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="116.3" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.start (9 samples, 0.69%)</title><rect x="113.3" y="771.0" width="8.2" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="116.3" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$$Lambda$2968/875695280.apply (9 samples, 0.69%)</title><rect x="113.3" y="755.0" width="8.2" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="116.3" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1$adapted (9 samples, 0.69%)</title><rect x="113.3" y="739.0" width="8.2" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="116.3" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1 (9 samples, 0.69%)</title><rect x="113.3" y="723.0" width="8.2" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="116.3" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$$$Lambda$3310/1911393170.apply (9 samples, 0.69%)</title><rect x="113.3" y="707.0" width="8.2" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="116.3" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1$adapted (9 samples, 0.69%)</title><rect x="113.3" y="691.0" width="8.2" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="116.3" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1 (9 samples, 0.69%)</title><rect x="113.3" y="675.0" width="8.2" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="116.3" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Successful.onComplete (9 samples, 0.69%)</title><rect x="113.3" y="659.0" width="8.2" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="116.3" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Kept.onComplete$ (9 samples, 0.69%)</title><rect x="113.3" y="643.0" width="8.2" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="116.3" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Kept.onComplete (9 samples, 0.69%)</title><rect x="113.3" y="627.0" width="8.2" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="116.3" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (9 samples, 0.69%)</title><rect x="113.3" y="611.0" width="8.2" height="15" fill="#5ef15e" rx="2" ry="2"/>
+<text x="116.3" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (9 samples, 0.69%)</title><rect x="113.3" y="595.0" width="8.2" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="116.3" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (9 samples, 0.69%)</title><rect x="113.3" y="579.0" width="8.2" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="116.3" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (9 samples, 0.69%)</title><rect x="113.3" y="563.0" width="8.2" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="116.3" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (9 samples, 0.69%)</title><rect x="113.3" y="547.0" width="8.2" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="116.3" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (9 samples, 0.69%)</title><rect x="113.3" y="531.0" width="8.2" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="116.3" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$anon$2.run (1,004 samples, 77.11%)</title><rect x="121.5" y="1059.0" width="909.9" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="124.5" y="1070.0">org/http4s/server/blaze/Http1ServerStage$$anon$2.run</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/SyncIO.unsafeRunSync (1,004 samples, 77.11%)</title><rect x="121.5" y="1043.0" width="909.9" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="124.5" y="1054.0">cats/effect/SyncIO.unsafeRunSync</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunSync (1,004 samples, 77.11%)</title><rect x="121.5" y="1027.0" width="909.9" height="15" fill="#39cf39" rx="2" ry="2"/>
+<text x="124.5" y="1038.0">cats/effect/IO.unsafeRunSync</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunTimed (1,004 samples, 77.11%)</title><rect x="121.5" y="1011.0" width="909.9" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="124.5" y="1022.0">cats/effect/IO.unsafeRunTimed</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.step (1,004 samples, 77.11%)</title><rect x="121.5" y="995.0" width="909.9" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="124.5" y="1006.0">cats/effect/internals/IORunLoop$.step</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (1,004 samples, 77.11%)</title><rect x="121.5" y="979.0" width="909.9" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="124.5" y="990.0">scala/runtime/java8/JFunction0$mcV$sp.apply</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$Lambda$3184/1360284129.apply$mcV$sp (1,004 samples, 77.11%)</title><rect x="121.5" y="963.0" width="909.9" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="124.5" y="974.0">cats/effect/IO$$Lambda$3184/1360284129.apply$mcV$sp</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.$anonfun$runAsync$1 (1,004 samples, 77.11%)</title><rect x="121.5" y="947.0" width="909.9" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="124.5" y="958.0">cats/effect/IO.$anonfun$runAsync$1</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunAsync (1,004 samples, 77.11%)</title><rect x="121.5" y="931.0" width="909.9" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="124.5" y="942.0">cats/effect/IO.unsafeRunAsync</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.start (1,004 samples, 77.11%)</title><rect x="121.5" y="915.0" width="909.9" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="124.5" y="926.0">cats/effect/internals/IORunLoop$.start</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (1,004 samples, 77.11%)</title><rect x="121.5" y="899.0" width="909.9" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="124.5" y="910.0">cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad$$Lambda$3505/903968169.apply (6 samples, 0.46%)</title><rect x="121.5" y="883.0" width="5.4" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="124.5" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad.$anonfun$tailRecM$1 (6 samples, 0.46%)</title><rect x="121.5" y="867.0" width="5.4" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="124.5" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IOLowPriorityInstances$IOEffect.tailRecM (6 samples, 0.46%)</title><rect x="121.5" y="851.0" width="5.4" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="124.5" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad.tailRecM$ (6 samples, 0.46%)</title><rect x="121.5" y="835.0" width="5.4" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="124.5" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad.tailRecM (6 samples, 0.46%)</title><rect x="121.5" y="819.0" width="5.4" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="124.5" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/free/Free$$Lambda$3502/1677729537.apply (6 samples, 0.46%)</title><rect x="121.5" y="803.0" width="5.4" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="124.5" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/free/Free.$anonfun$foldMap$1 (6 samples, 0.46%)</title><rect x="121.5" y="787.0" width="5.4" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="124.5" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/free/Free.foldMap (6 samples, 0.46%)</title><rect x="121.5" y="771.0" width="5.4" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="124.5" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IOLowPriorityInstances$IOEffect.tailRecM (6 samples, 0.46%)</title><rect x="121.5" y="755.0" width="5.4" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="124.5" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad.tailRecM$ (6 samples, 0.46%)</title><rect x="121.5" y="739.0" width="5.4" height="15" fill="#3ad03a" rx="2" ry="2"/>
+<text x="124.5" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/StackSafeMonad.tailRecM (6 samples, 0.46%)</title><rect x="121.5" y="723.0" width="5.4" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="124.5" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/free/Free$$Lambda$3502/1677729537.apply (6 samples, 0.46%)</title><rect x="121.5" y="707.0" width="5.4" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="124.5" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/free/Free.$anonfun$foldMap$1 (6 samples, 0.46%)</title><rect x="121.5" y="691.0" width="5.4" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="124.5" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/arrow/FunctionK$$anon$2.apply (6 samples, 0.46%)</title><rect x="121.5" y="675.0" width="5.4" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="124.5" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/arrow/FunctionK$$anon$2.apply (6 samples, 0.46%)</title><rect x="121.5" y="659.0" width="5.4" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="124.5" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/data/EitherK.fold (6 samples, 0.46%)</title><rect x="121.5" y="643.0" width="5.4" height="15" fill="#3ad03a" rx="2" ry="2"/>
+<text x="124.5" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/util/Either.fold (6 samples, 0.46%)</title><rect x="121.5" y="627.0" width="5.4" height="15" fill="#6cfe6c" rx="2" ry="2"/>
+<text x="124.5" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/data/EitherK$$Lambda$3509/1097715892.apply (6 samples, 0.46%)</title><rect x="121.5" y="611.0" width="5.4" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="124.5" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/data/EitherK.$anonfun$fold$2 (6 samples, 0.46%)</title><rect x="121.5" y="595.0" width="5.4" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="124.5" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/marshalling$$anon$1.apply (6 samples, 0.46%)</title><rect x="121.5" y="579.0" width="5.4" height="15" fill="#53e753" rx="2" ry="2"/>
+<text x="124.5" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/marshalling$$anon$1.apply (6 samples, 0.46%)</title><rect x="121.5" y="563.0" width="5.4" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="124.5" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/circe/HammockCodecForCirce.decode (6 samples, 0.46%)</title><rect x="121.5" y="547.0" width="5.4" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="124.5" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/circe/HammockDecoderForCirce.decode (6 samples, 0.46%)</title><rect x="121.5" y="531.0" width="5.4" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="124.5" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/parser/package$.decode (6 samples, 0.46%)</title><rect x="121.5" y="515.0" width="5.4" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="124.5" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Parser.decode$ (6 samples, 0.46%)</title><rect x="121.5" y="499.0" width="5.4" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="124.5" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Parser.decode (6 samples, 0.46%)</title><rect x="121.5" y="483.0" width="5.4" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="124.5" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/parser/package$.finishDecode (2 samples, 0.15%)</title><rect x="121.5" y="467.0" width="1.8" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="124.5" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Parser.finishDecode$ (2 samples, 0.15%)</title><rect x="121.5" y="451.0" width="1.8" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="124.5" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Parser.finishDecode (2 samples, 0.15%)</title><rect x="121.5" y="435.0" width="1.8" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="124.5" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/generic/decoding/DerivedDecoder.decodeJson (2 samples, 0.15%)</title><rect x="121.5" y="419.0" width="1.8" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="124.5" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.decodeJson$ (2 samples, 0.15%)</title><rect x="121.5" y="403.0" width="1.8" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="124.5" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.decodeJson (2 samples, 0.15%)</title><rect x="121.5" y="387.0" width="1.8" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="124.5" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/generic/decoding/DerivedDecoder$$anon$1.apply (2 samples, 0.15%)</title><rect x="121.5" y="371.0" width="1.8" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="124.5" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$anon$importedDecoder$macro$43$1$$anon$12.apply (2 samples, 0.15%)</title><rect x="121.5" y="355.0" width="1.8" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="124.5" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/SeqDecoder.tryDecode (2 samples, 0.15%)</title><rect x="121.5" y="339.0" width="1.8" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="124.5" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.tryDecode$ (2 samples, 0.15%)</title><rect x="121.5" y="323.0" width="1.8" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="124.5" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.tryDecode (2 samples, 0.15%)</title><rect x="121.5" y="307.0" width="1.8" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="124.5" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/SeqDecoder.apply (2 samples, 0.15%)</title><rect x="121.5" y="291.0" width="1.8" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="124.5" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/generic/decoding/DerivedDecoder$$anon$1.apply (2 samples, 0.15%)</title><rect x="121.5" y="275.0" width="1.8" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="124.5" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$anon$importedDecoder$macro$43$1$$anon$11.apply (2 samples, 0.15%)</title><rect x="121.5" y="259.0" width="1.8" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="124.5" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/generic/decoding/DerivedDecoder.tryDecode (2 samples, 0.15%)</title><rect x="121.5" y="243.0" width="1.8" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="124.5" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.tryDecode$ (2 samples, 0.15%)</title><rect x="121.5" y="227.0" width="1.8" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="124.5" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Decoder.tryDecode (2 samples, 0.15%)</title><rect x="121.5" y="211.0" width="1.8" height="15" fill="#39cf39" rx="2" ry="2"/>
+<text x="124.5" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/generic/decoding/DerivedDecoder$$anon$1.apply (2 samples, 0.15%)</title><rect x="121.5" y="195.0" width="1.8" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="124.5" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$anon$importedDecoder$macro$43$1$$anon$10.apply (2 samples, 0.15%)</title><rect x="121.5" y="179.0" width="1.8" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="124.5" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/parser/package$.parse (4 samples, 0.31%)</title><rect x="123.3" y="467.0" width="3.6" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="126.3" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/jawn/JawnParser.parse (4 samples, 0.31%)</title><rect x="123.3" y="451.0" width="3.6" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="126.3" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/jawn/CirceSupportParser$.parseFromString (4 samples, 0.31%)</title><rect x="123.3" y="435.0" width="3.6" height="15" fill="#47dc47" rx="2" ry="2"/>
+<text x="126.3" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/SupportParser.parseFromString$ (4 samples, 0.31%)</title><rect x="123.3" y="419.0" width="3.6" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="126.3" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/SupportParser.parseFromString (4 samples, 0.31%)</title><rect x="123.3" y="403.0" width="3.6" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="126.3" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/util/Try$.apply (4 samples, 0.31%)</title><rect x="123.3" y="387.0" width="3.6" height="15" fill="#60f360" rx="2" ry="2"/>
+<text x="126.3" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/SupportParser$$Lambda$3556/1576184024.apply (4 samples, 0.31%)</title><rect x="123.3" y="371.0" width="3.6" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="126.3" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/SupportParser.$anonfun$parseFromString$1 (4 samples, 0.31%)</title><rect x="123.3" y="355.0" width="3.6" height="15" fill="#46db46" rx="2" ry="2"/>
+<text x="126.3" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/SyncParser.parse (4 samples, 0.31%)</title><rect x="123.3" y="339.0" width="3.6" height="15" fill="#4de04d" rx="2" ry="2"/>
+<text x="126.3" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/Parser.parse (4 samples, 0.31%)</title><rect x="123.3" y="323.0" width="3.6" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="126.3" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/Parser.rparse (4 samples, 0.31%)</title><rect x="123.3" y="307.0" width="3.6" height="15" fill="#69fb69" rx="2" ry="2"/>
+<text x="126.3" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/StringParser.parseString (2 samples, 0.15%)</title><rect x="125.1" y="291.0" width="1.8" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="128.1" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/CharBasedParser.parseString$ (2 samples, 0.15%)</title><rect x="125.1" y="275.0" width="1.8" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="128.1" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jawn/CharBasedParser.parseString (2 samples, 0.15%)</title><rect x="125.1" y="259.0" width="1.8" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="128.1" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$Map.apply (2 samples, 0.15%)</title><rect x="126.9" y="883.0" width="1.8" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="129.9" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$Map.apply (2 samples, 0.15%)</title><rect x="126.9" y="867.0" width="1.8" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="129.9" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>itable stub (2 samples, 0.15%)</title><rect x="126.9" y="851.0" width="1.8" height="15" fill="#f77676" rx="2" ry="2"/>
+<text x="129.9" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.liftedTree1$1 (5 samples, 0.38%)</title><rect x="128.7" y="883.0" width="4.6" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="131.7" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/HttpRoutes$$$Lambda$3186/1890832109.apply (5 samples, 0.38%)</title><rect x="128.7" y="867.0" width="4.6" height="15" fill="#50e350" rx="2" ry="2"/>
+<text x="131.7" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/HttpRoutes$.$anonfun$of$2 (5 samples, 0.38%)</title><rect x="128.7" y="851.0" width="4.6" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="131.7" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/PartialFunction$Lifted.apply (5 samples, 0.38%)</title><rect x="128.7" y="835.0" width="4.6" height="15" fill="#63f463" rx="2" ry="2"/>
+<text x="131.7" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/PartialFunction$Lifted.apply (5 samples, 0.38%)</title><rect x="128.7" y="819.0" width="4.6" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="131.7" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/api/HttpService$$anonfun$1.applyOrElse (5 samples, 0.38%)</title><rect x="128.7" y="803.0" width="4.6" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="131.7" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/api/HttpService$$anonfun$1.applyOrElse (5 samples, 0.38%)</title><rect x="128.7" y="787.0" width="4.6" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="131.7" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$$$Lambda$2964/1007511341.apply (5 samples, 0.38%)</title><rect x="128.7" y="771.0" width="4.6" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="131.7" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$.$anonfun$service$1 (5 samples, 0.38%)</title><rect x="128.7" y="755.0" width="4.6" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="131.7" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$.getInfluencerResults (5 samples, 0.38%)</title><rect x="128.7" y="739.0" width="4.6" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="131.7" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/List.map (5 samples, 0.38%)</title><rect x="128.7" y="723.0" width="4.6" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="131.7" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$$$Lambda$3332/590187092.apply (5 samples, 0.38%)</title><rect x="128.7" y="707.0" width="4.6" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="131.7" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/Main$.$anonfun$getInfluencerResults$3 (5 samples, 0.38%)</title><rect x="128.7" y="691.0" width="4.6" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="131.7" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/package$UriInterpolator$.evaluate (5 samples, 0.38%)</title><rect x="128.7" y="675.0" width="4.6" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="131.7" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$.fromString (5 samples, 0.38%)</title><rect x="128.7" y="659.0" width="4.6" height="15" fill="#65f665" rx="2" ry="2"/>
+<text x="131.7" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/syntax/ToParserOps$$anon$1.parseOnly (5 samples, 0.38%)</title><rect x="128.7" y="643.0" width="4.6" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="131.7" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/syntax/ParserOps.parseOnly$ (5 samples, 0.38%)</title><rect x="128.7" y="627.0" width="4.6" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="131.7" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/syntax/ParserOps.parseOnly (5 samples, 0.38%)</title><rect x="128.7" y="611.0" width="4.6" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="131.7" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/Parser$.parseOnly (5 samples, 0.38%)</title><rect x="128.7" y="595.0" width="4.6" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="131.7" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/ParserFunctions.parseOnly$ (5 samples, 0.38%)</title><rect x="128.7" y="579.0" width="4.6" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="131.7" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/ParserFunctions.parseOnly (5 samples, 0.38%)</title><rect x="128.7" y="563.0" width="4.6" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="131.7" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Eval$Defer.value (5 samples, 0.38%)</title><rect x="128.7" y="547.0" width="4.6" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="131.7" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Eval$.cats$Eval$$evaluate (5 samples, 0.38%)</title><rect x="128.7" y="531.0" width="4.6" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="131.7" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Eval$.loop$1 (5 samples, 0.38%)</title><rect x="128.7" y="515.0" width="4.6" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="131.7" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Eval$.advance (5 samples, 0.38%)</title><rect x="128.7" y="499.0" width="4.6" height="15" fill="#66f766" rx="2" ry="2"/>
+<text x="131.7" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>atto/Parser$$anon$5$$Lambda$3378/151076922.apply (2 samples, 0.15%)</title><rect x="128.7" y="483.0" width="1.8" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="131.7" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.popNextBind (2 samples, 0.15%)</title><rect x="133.3" y="883.0" width="1.8" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="136.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/api/HttpService$$anonfun$1$$Lambda$3525/881771833.apply (2 samples, 0.15%)</title><rect x="135.1" y="883.0" width="1.8" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="138.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/michalplachta/influencerstats/api/HttpService$$anonfun$1.$anonfun$applyOrElse$5 (2 samples, 0.15%)</title><rect x="135.1" y="867.0" width="1.8" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="138.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/dsl/impl/Responses$OkOps.apply (2 samples, 0.15%)</title><rect x="135.1" y="851.0" width="1.8" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="138.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/dsl/impl/EntityResponseGenerator.apply$ (2 samples, 0.15%)</title><rect x="135.1" y="835.0" width="1.8" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="138.1" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/dsl/impl/EntityResponseGenerator.apply (2 samples, 0.15%)</title><rect x="135.1" y="819.0" width="1.8" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="138.1" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/EntityEncoder$$anon$2.toEntity (2 samples, 0.15%)</title><rect x="135.1" y="803.0" width="1.8" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="138.1" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/EntityEncoder$$anon$3.toEntity (2 samples, 0.15%)</title><rect x="135.1" y="787.0" width="1.8" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="138.1" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/EntityEncoder$$anon$2.toEntity (2 samples, 0.15%)</title><rect x="135.1" y="771.0" width="1.8" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="138.1" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/circe/CirceInstances$$Lambda$3574/1354873863.apply (2 samples, 0.15%)</title><rect x="135.1" y="755.0" width="1.8" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="138.1" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/circe/CirceInstances.$anonfun$jsonEncoderWithPrinter$1 (2 samples, 0.15%)</title><rect x="135.1" y="739.0" width="1.8" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="138.1" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer.prettyByteBuffer (2 samples, 0.15%)</title><rect x="135.1" y="723.0" width="1.8" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="138.1" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer.prettyByteBuffer (2 samples, 0.15%)</title><rect x="135.1" y="707.0" width="1.8" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="138.1" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Json$JObject.foldWith (2 samples, 0.15%)</title><rect x="135.1" y="691.0" width="1.8" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="138.1" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer$PrintingFolder.onObject (2 samples, 0.15%)</title><rect x="135.1" y="675.0" width="1.8" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="138.1" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer$PrintingFolder.onObject (2 samples, 0.15%)</title><rect x="135.1" y="659.0" width="1.8" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="138.1" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/JsonObject$LinkedHashMapJsonObject.appendToFolder (2 samples, 0.15%)</title><rect x="135.1" y="643.0" width="1.8" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="138.1" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Json$JNumber.foldWith (2 samples, 0.15%)</title><rect x="135.1" y="627.0" width="1.8" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="138.1" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer$AppendableByteBufferFolder.onNumber (2 samples, 0.15%)</title><rect x="135.1" y="611.0" width="1.8" height="15" fill="#4de04d" rx="2" ry="2"/>
+<text x="138.1" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/Printer$AppendableByteBufferFolder.onNumber (2 samples, 0.15%)</title><rect x="135.1" y="595.0" width="1.8" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="138.1" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/circe/JsonLong.toString (2 samples, 0.15%)</title><rect x="135.1" y="579.0" width="1.8" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="138.1" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Long.toString (2 samples, 0.15%)</title><rect x="135.1" y="563.0" width="1.8" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="138.1" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jshort_disjoint_arraycopy (2 samples, 0.15%)</title><rect x="135.1" y="547.0" width="1.8" height="15" fill="#d94b4b" rx="2" ry="2"/>
+<text x="138.1" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3511/1004306017.apply (12 samples, 0.92%)</title><rect x="136.9" y="883.0" width="10.9" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="139.9" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$getApacheRequest$1 (12 samples, 0.92%)</title><rect x="136.9" y="867.0" width="10.9" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="139.9" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$ToShowOps$$anon$4.show (9 samples, 0.69%)</title><rect x="136.9" y="851.0" width="8.1" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="139.9" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$Ops.show$ (9 samples, 0.69%)</title><rect x="136.9" y="835.0" width="8.1" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="139.9" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$Ops.show (9 samples, 0.69%)</title><rect x="136.9" y="819.0" width="8.1" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="139.9" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1.show (9 samples, 0.69%)</title><rect x="136.9" y="803.0" width="8.1" height="15" fill="#47dc47" rx="2" ry="2"/>
+<text x="139.9" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1.show (9 samples, 0.69%)</title><rect x="136.9" y="787.0" width="8.1" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="139.9" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/Option.fold (2 samples, 0.15%)</title><rect x="136.9" y="771.0" width="1.8" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="139.9" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1$$Lambda$3530/1480755505.apply (2 samples, 0.15%)</title><rect x="136.9" y="755.0" width="1.8" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="139.9" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1.$anonfun$show$9 (2 samples, 0.15%)</title><rect x="136.9" y="739.0" width="1.8" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="139.9" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$ToShowOps$$anon$4.show (2 samples, 0.15%)</title><rect x="136.9" y="723.0" width="1.8" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="139.9" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$Ops.show$ (2 samples, 0.15%)</title><rect x="136.9" y="707.0" width="1.8" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="139.9" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Show$Ops.show (2 samples, 0.15%)</title><rect x="136.9" y="691.0" width="1.8" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="139.9" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$Authority$$anon$4.show (2 samples, 0.15%)</title><rect x="136.9" y="675.0" width="1.8" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="139.9" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$Authority$$anon$4.show (2 samples, 0.15%)</title><rect x="136.9" y="659.0" width="1.8" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="139.9" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/AbstractTraversable.map (3 samples, 0.23%)</title><rect x="138.7" y="771.0" width="2.7" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="141.7" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.map$ (3 samples, 0.23%)</title><rect x="138.7" y="755.0" width="2.7" height="15" fill="#4bde4b" rx="2" ry="2"/>
+<text x="141.7" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.map (3 samples, 0.23%)</title><rect x="138.7" y="739.0" width="2.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="141.7" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Map$Map3.foreach (3 samples, 0.23%)</title><rect x="138.7" y="723.0" width="2.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="141.7" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike$$Lambda$6/1908981452.apply (3 samples, 0.23%)</title><rect x="138.7" y="707.0" width="2.7" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="141.7" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.$anonfun$map$1 (3 samples, 0.23%)</title><rect x="138.7" y="691.0" width="2.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="141.7" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1$$Lambda$3526/879315002.apply (3 samples, 0.23%)</title><rect x="138.7" y="675.0" width="2.7" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="141.7" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/Uri$$anon$1.$anonfun$show$5 (3 samples, 0.23%)</title><rect x="138.7" y="659.0" width="2.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="141.7" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/StringBuilder.append (3 samples, 0.23%)</title><rect x="138.7" y="643.0" width="2.7" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="141.7" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/String.valueOf (2 samples, 0.15%)</title><rect x="139.6" y="627.0" width="1.8" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="142.6" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/StringOps.$plus$plus (4 samples, 0.31%)</title><rect x="141.4" y="771.0" width="3.6" height="15" fill="#5ff25f" rx="2" ry="2"/>
+<text x="144.4" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.$plus$plus$ (4 samples, 0.31%)</title><rect x="141.4" y="755.0" width="3.6" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="144.4" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.$plus$plus (4 samples, 0.31%)</title><rect x="141.4" y="739.0" width="3.6" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="144.4" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/StringBuilder.$plus$plus$eq (4 samples, 0.31%)</title><rect x="141.4" y="723.0" width="3.6" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="144.4" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/generic/Growable.$plus$plus$eq$ (4 samples, 0.31%)</title><rect x="141.4" y="707.0" width="3.6" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="144.4" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/generic/Growable.$plus$plus$eq (4 samples, 0.31%)</title><rect x="141.4" y="691.0" width="3.6" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="144.4" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/WrappedString.foreach (4 samples, 0.31%)</title><rect x="141.4" y="675.0" width="3.6" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="144.4" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach$ (4 samples, 0.31%)</title><rect x="141.4" y="659.0" width="3.6" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="144.4" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach (4 samples, 0.31%)</title><rect x="141.4" y="643.0" width="3.6" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="144.4" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/generic/Growable$$Lambda$47/530737374.apply (2 samples, 0.15%)</title><rect x="143.2" y="627.0" width="1.8" height="15" fill="#42d642" rx="2" ry="2"/>
+<text x="146.2" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/generic/Growable.$anonfun$$plus$plus$eq$1 (2 samples, 0.15%)</title><rect x="143.2" y="611.0" width="1.8" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="146.2" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>itable stub (2 samples, 0.15%)</title><rect x="143.2" y="595.0" width="1.8" height="15" fill="#d74848" rx="2" ry="2"/>
+<text x="146.2" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.prepareHeaders (2 samples, 0.15%)</title><rect x="145.0" y="851.0" width="1.9" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="148.0" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3538/638829175.apply (830 samples, 63.75%)</title><rect x="147.8" y="883.0" width="752.2" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="150.8" y="894.0">hammock/jvm/Interpreter$$Lambda$3538/638829175.apply</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$doReq$3 (830 samples, 63.75%)</title><rect x="147.8" y="867.0" width="752.2" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="150.8" y="878.0">hammock/jvm/Interpreter.$anonfun$doReq$3</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/client/CloseableHttpClient.execute (830 samples, 63.75%)</title><rect x="147.8" y="851.0" width="752.2" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="150.8" y="862.0">org/apache/http/impl/client/CloseableHttpClient.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/client/CloseableHttpClient.execute (830 samples, 63.75%)</title><rect x="147.8" y="835.0" width="752.2" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="150.8" y="846.0">org/apache/http/impl/client/CloseableHttpClient.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/client/CloseableHttpClient.execute (830 samples, 63.75%)</title><rect x="147.8" y="819.0" width="752.2" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="150.8" y="830.0">org/apache/http/impl/client/CloseableHttpClient.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/client/InternalHttpClient.doExecute (829 samples, 63.67%)</title><rect x="148.7" y="803.0" width="751.3" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="151.7" y="814.0">org/apache/http/impl/client/InternalHttpClient.doExecute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/RedirectExec.execute (828 samples, 63.59%)</title><rect x="148.7" y="787.0" width="750.4" height="15" fill="#6cfe6c" rx="2" ry="2"/>
+<text x="151.7" y="798.0">org/apache/http/impl/execchain/RedirectExec.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/RetryExec.execute (827 samples, 63.52%)</title><rect x="149.6" y="771.0" width="749.5" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="152.6" y="782.0">org/apache/http/impl/execchain/RetryExec.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ProtocolExec.execute (827 samples, 63.52%)</title><rect x="149.6" y="755.0" width="749.5" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="152.6" y="766.0">org/apache/http/impl/execchain/ProtocolExec.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/MainClientExec.execute (820 samples, 62.98%)</title><rect x="149.6" y="739.0" width="743.1" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="152.6" y="750.0">org/apache/http/impl/execchain/MainClientExec.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/client/DefaultClientConnectionReuseStrategy.keepAlive (3 samples, 0.23%)</title><rect x="150.5" y="723.0" width="2.7" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="153.5" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/DefaultConnectionReuseStrategy.keepAlive (2 samples, 0.15%)</title><rect x="150.5" y="707.0" width="1.8" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="153.5" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/PoolingHttpClientConnectionManager$1.get (4 samples, 0.31%)</title><rect x="153.2" y="723.0" width="3.6" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="156.2" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/CPoolProxy.setSocketTimeout (3 samples, 0.23%)</title><rect x="153.2" y="707.0" width="2.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="156.2" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/LoggingManagedHttpClientConnection.setSocketTimeout (3 samples, 0.23%)</title><rect x="153.2" y="691.0" width="2.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="156.2" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/BHttpConnectionBase.setSocketTimeout (3 samples, 0.23%)</title><rect x="153.2" y="675.0" width="2.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="156.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.setSoTimeout (3 samples, 0.23%)</title><rect x="153.2" y="659.0" width="2.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="156.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/MainClientExec.establishRoute (9 samples, 0.69%)</title><rect x="156.8" y="723.0" width="8.2" height="15" fill="#40d440" rx="2" ry="2"/>
+<text x="159.8" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/PoolingHttpClientConnectionManager.connect (9 samples, 0.69%)</title><rect x="156.8" y="707.0" width="8.2" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="159.8" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/DefaultHttpClientConnectionOperator.connect (9 samples, 0.69%)</title><rect x="156.8" y="691.0" width="8.2" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="159.8" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.setSoTimeout (7 samples, 0.54%)</title><rect x="156.8" y="675.0" width="6.4" height="15" fill="#58ea58" rx="2" ry="2"/>
+<text x="159.8" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.getImpl (7 samples, 0.54%)</title><rect x="156.8" y="659.0" width="6.4" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="159.8" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.createImpl (7 samples, 0.54%)</title><rect x="156.8" y="643.0" width="6.4" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="159.8" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.create (7 samples, 0.54%)</title><rect x="156.8" y="627.0" width="6.4" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="159.8" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/PlainSocketImpl.socketCreate (7 samples, 0.54%)</title><rect x="156.8" y="611.0" width="6.4" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="159.8" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/conn/socket/PlainConnectionSocketFactory.connectSocket (2 samples, 0.15%)</title><rect x="163.2" y="675.0" width="1.8" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="166.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.connect (2 samples, 0.15%)</title><rect x="163.2" y="659.0" width="1.8" height="15" fill="#58ea58" rx="2" ry="2"/>
+<text x="166.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocksSocketImpl.connect (2 samples, 0.15%)</title><rect x="163.2" y="643.0" width="1.8" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="166.2" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.connect (2 samples, 0.15%)</title><rect x="163.2" y="627.0" width="1.8" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="166.2" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.connectToAddress (2 samples, 0.15%)</title><rect x="163.2" y="611.0" width="1.8" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="166.2" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.doConnect (2 samples, 0.15%)</title><rect x="163.2" y="595.0" width="1.8" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="166.2" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/PlainSocketImpl.socketConnect (2 samples, 0.15%)</title><rect x="163.2" y="579.0" width="1.8" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="166.2" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/protocol/HttpRequestExecutor.execute (802 samples, 61.60%)</title><rect x="165.9" y="723.0" width="726.8" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="168.9" y="734.0">org/apache/http/protocol/HttpRequestExecutor.execute</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/protocol/HttpRequestExecutor.doReceiveResponse (150 samples, 11.52%)</title><rect x="165.9" y="707.0" width="135.9" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="168.9" y="718.0">org/apache/http/p..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/CPoolProxy.receiveResponseHeader (150 samples, 11.52%)</title><rect x="165.9" y="691.0" width="135.9" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="168.9" y="702.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/DefaultBHttpClientConnection.receiveResponseHeader (150 samples, 11.52%)</title><rect x="165.9" y="675.0" width="135.9" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="168.9" y="686.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/AbstractMessageParser.parse (150 samples, 11.52%)</title><rect x="165.9" y="659.0" width="135.9" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="168.9" y="670.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/DefaultHttpResponseParser.parseHead (150 samples, 11.52%)</title><rect x="165.9" y="643.0" width="135.9" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="168.9" y="654.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/DefaultHttpResponseParser.parseHead (150 samples, 11.52%)</title><rect x="165.9" y="627.0" width="135.9" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="168.9" y="638.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionInputBufferImpl.readLine (148 samples, 11.37%)</title><rect x="165.9" y="611.0" width="134.1" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="168.9" y="622.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionInputBufferImpl.fillBuffer (148 samples, 11.37%)</title><rect x="165.9" y="595.0" width="134.1" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="168.9" y="606.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionInputBufferImpl.streamRead (148 samples, 11.37%)</title><rect x="165.9" y="579.0" width="134.1" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="168.9" y="590.0">org/apache/http/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (148 samples, 11.37%)</title><rect x="165.9" y="563.0" width="134.1" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="168.9" y="574.0">java/net/SocketIn..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (148 samples, 11.37%)</title><rect x="165.9" y="547.0" width="134.1" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="168.9" y="558.0">java/net/SocketIn..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead (148 samples, 11.37%)</title><rect x="165.9" y="531.0" width="134.1" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="168.9" y="542.0">java/net/SocketIn..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead0 (148 samples, 11.37%)</title><rect x="165.9" y="515.0" width="134.1" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="168.9" y="526.0">java/net/SocketIn..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/message/BasicLineParser.parseStatusLine (2 samples, 0.15%)</title><rect x="300.0" y="611.0" width="1.8" height="15" fill="#44d944" rx="2" ry="2"/>
+<text x="303.0" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/protocol/HttpRequestExecutor.doSendRequest (652 samples, 50.08%)</title><rect x="301.8" y="707.0" width="590.9" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="304.8" y="718.0">org/apache/http/protocol/HttpRequestExecutor.doSendRequest</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/CPoolProxy.flush (651 samples, 50.00%)</title><rect x="301.8" y="691.0" width="590.0" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="304.8" y="702.0">org/apache/http/impl/conn/CPoolProxy.flush</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/DefaultBHttpClientConnection.flush (651 samples, 50.00%)</title><rect x="301.8" y="675.0" width="590.0" height="15" fill="#44d944" rx="2" ry="2"/>
+<text x="304.8" y="686.0">org/apache/http/impl/DefaultBHttpClientConnection.flush</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/BHttpConnectionBase.doFlush (651 samples, 50.00%)</title><rect x="301.8" y="659.0" width="590.0" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="304.8" y="670.0">org/apache/http/impl/BHttpConnectionBase.doFlush</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionOutputBufferImpl.flush (651 samples, 50.00%)</title><rect x="301.8" y="643.0" width="590.0" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="304.8" y="654.0">org/apache/http/impl/io/SessionOutputBufferImpl.flush</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionOutputBufferImpl.flushBuffer (651 samples, 50.00%)</title><rect x="301.8" y="627.0" width="590.0" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="304.8" y="638.0">org/apache/http/impl/io/SessionOutputBufferImpl.flushBuffer</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/io/SessionOutputBufferImpl.streamWrite (651 samples, 50.00%)</title><rect x="301.8" y="611.0" width="590.0" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="304.8" y="622.0">org/apache/http/impl/io/SessionOutputBufferImpl.streamWrite</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.write (651 samples, 50.00%)</title><rect x="301.8" y="595.0" width="590.0" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="304.8" y="606.0">java/net/SocketOutputStream.write</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.socketWrite (651 samples, 50.00%)</title><rect x="301.8" y="579.0" width="590.0" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="304.8" y="590.0">java/net/SocketOutputStream.socketWrite</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.socketWrite0 (651 samples, 50.00%)</title><rect x="301.8" y="563.0" width="590.0" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="304.8" y="574.0">java/net/SocketOutputStream.socketWrite0</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ProtocolExec.rewriteRequestURI (2 samples, 0.15%)</title><rect x="892.7" y="739.0" width="1.8" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="895.7" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/client/utils/URIUtils.rewriteURIForRoute (2 samples, 0.15%)</title><rect x="892.7" y="723.0" width="1.8" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="895.7" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/client/utils/URIUtils.rewriteURI (2 samples, 0.15%)</title><rect x="892.7" y="707.0" width="1.8" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="895.7" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/protocol/ImmutableHttpProcessor.process (4 samples, 0.31%)</title><rect x="895.5" y="739.0" width="3.6" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="898.5" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/client/protocol/RequestAddCookies.process (2 samples, 0.15%)</title><rect x="895.5" y="723.0" width="1.8" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="898.5" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/client/protocol/RequestDefaultHeaders.process (2 samples, 0.15%)</title><rect x="897.3" y="723.0" width="1.8" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="900.3" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3540/93381097.apply (27 samples, 2.07%)</title><rect x="900.9" y="883.0" width="24.5" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="903.9" y="894.0">h..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$responseToEntity$1 (27 samples, 2.07%)</title><rect x="900.9" y="867.0" width="24.5" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="903.9" y="878.0">h..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/Option.map (27 samples, 2.07%)</title><rect x="900.9" y="851.0" width="24.5" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="903.9" y="862.0">s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3543/787206686.apply (27 samples, 2.07%)</title><rect x="900.9" y="835.0" width="24.5" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="903.9" y="846.0">h..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$responseToEntity$3 (27 samples, 2.07%)</title><rect x="900.9" y="819.0" width="24.5" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="903.9" y="830.0">h..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$.continually (6 samples, 0.46%)</title><rect x="901.8" y="803.0" width="5.4" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="904.8" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3544/441559296.apply (6 samples, 0.46%)</title><rect x="901.8" y="787.0" width="5.4" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="904.8" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$responseToEntity$4 (6 samples, 0.46%)</title><rect x="901.8" y="771.0" width="5.4" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="904.8" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (4 samples, 0.31%)</title><rect x="903.6" y="755.0" width="3.6" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="906.6" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (4 samples, 0.31%)</title><rect x="903.6" y="739.0" width="3.6" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="906.6" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.fill (2 samples, 0.15%)</title><rect x="905.4" y="723.0" width="1.8" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="908.4" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/InputStreamReader.read (2 samples, 0.15%)</title><rect x="905.4" y="707.0" width="1.8" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="908.4" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.mkString (20 samples, 1.54%)</title><rect x="907.2" y="803.0" width="18.2" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="910.2" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.mkString (20 samples, 1.54%)</title><rect x="907.2" y="787.0" width="18.2" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="910.2" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce.mkString$ (3 samples, 0.23%)</title><rect x="907.2" y="771.0" width="2.8" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="910.2" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce.mkString (3 samples, 0.23%)</title><rect x="907.2" y="755.0" width="2.8" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="910.2" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.addString (3 samples, 0.23%)</title><rect x="907.2" y="739.0" width="2.8" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="910.2" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/StringBuilder.append (3 samples, 0.23%)</title><rect x="907.2" y="723.0" width="2.8" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="910.2" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/StringBuilder.append (3 samples, 0.23%)</title><rect x="907.2" y="707.0" width="2.8" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="910.2" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/AbstractStringBuilder.append (3 samples, 0.23%)</title><rect x="907.2" y="691.0" width="2.8" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="910.2" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/AbstractStringBuilder.ensureCapacityInternal (3 samples, 0.23%)</title><rect x="907.2" y="675.0" width="2.8" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="910.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/Arrays.copyOf (3 samples, 0.23%)</title><rect x="907.2" y="659.0" width="2.8" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="910.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.force (17 samples, 1.31%)</title><rect x="910.0" y="771.0" width="15.4" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="913.0" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$Cons.tail (16 samples, 1.23%)</title><rect x="910.9" y="755.0" width="14.5" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="913.9" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$Cons.tail (16 samples, 1.23%)</title><rect x="910.9" y="739.0" width="14.5" height="15" fill="#52e652" rx="2" ry="2"/>
+<text x="913.9" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$$Lambda$3547/1804647048.apply (15 samples, 1.15%)</title><rect x="911.8" y="723.0" width="13.6" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="914.8" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.$anonfun$takeWhile$1 (15 samples, 1.15%)</title><rect x="911.8" y="707.0" width="13.6" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="914.8" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$Cons.tail (13 samples, 1.00%)</title><rect x="911.8" y="691.0" width="11.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="914.8" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$Cons.tail (13 samples, 1.00%)</title><rect x="911.8" y="675.0" width="11.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="914.8" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$$$Lambda$3548/2090735443.apply (11 samples, 0.84%)</title><rect x="913.6" y="659.0" width="9.9" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="916.6" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$.$anonfun$continually$1 (11 samples, 0.84%)</title><rect x="913.6" y="643.0" width="9.9" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="916.6" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3544/441559296.apply (11 samples, 0.84%)</title><rect x="913.6" y="627.0" width="9.9" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="916.6" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$responseToEntity$4 (11 samples, 0.84%)</title><rect x="913.6" y="611.0" width="9.9" height="15" fill="#63f463" rx="2" ry="2"/>
+<text x="916.6" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (11 samples, 0.84%)</title><rect x="913.6" y="595.0" width="9.9" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="916.6" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (11 samples, 0.84%)</title><rect x="913.6" y="579.0" width="9.9" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="916.6" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.fill (7 samples, 0.54%)</title><rect x="916.3" y="563.0" width="6.3" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="919.3" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/InputStreamReader.read (7 samples, 0.54%)</title><rect x="916.3" y="547.0" width="6.3" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="919.3" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.read (7 samples, 0.54%)</title><rect x="916.3" y="531.0" width="6.3" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="919.3" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.implRead (7 samples, 0.54%)</title><rect x="916.3" y="515.0" width="6.3" height="15" fill="#54e854" rx="2" ry="2"/>
+<text x="919.3" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.readBytes (7 samples, 0.54%)</title><rect x="916.3" y="499.0" width="6.3" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="919.3" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/conn/EofSensorInputStream.read (7 samples, 0.54%)</title><rect x="916.3" y="483.0" width="6.3" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="919.3" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/conn/EofSensorInputStream.checkEOF (7 samples, 0.54%)</title><rect x="916.3" y="467.0" width="6.3" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="919.3" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ResponseEntityProxy.eofDetected (7 samples, 0.54%)</title><rect x="916.3" y="451.0" width="6.3" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="919.3" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ResponseEntityProxy.releaseConnection (7 samples, 0.54%)</title><rect x="916.3" y="435.0" width="6.3" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="919.3" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ConnectionHolder.releaseConnection (7 samples, 0.54%)</title><rect x="916.3" y="419.0" width="6.3" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="919.3" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/execchain/ConnectionHolder.releaseConnection (7 samples, 0.54%)</title><rect x="916.3" y="403.0" width="6.3" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="919.3" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/CPoolProxy.close (4 samples, 0.31%)</title><rect x="916.3" y="387.0" width="3.6" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="919.3" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/CPoolEntry.closeConnection (4 samples, 0.31%)</title><rect x="916.3" y="371.0" width="3.6" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="919.3" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/LoggingManagedHttpClientConnection.close (4 samples, 0.31%)</title><rect x="916.3" y="355.0" width="3.6" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="919.3" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/BHttpConnectionBase.close (4 samples, 0.31%)</title><rect x="916.3" y="339.0" width="3.6" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="919.3" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/Socket.close (2 samples, 0.15%)</title><rect x="916.3" y="323.0" width="1.8" height="15" fill="#60f360" rx="2" ry="2"/>
+<text x="919.3" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocksSocketImpl.close (2 samples, 0.15%)</title><rect x="916.3" y="307.0" width="1.8" height="15" fill="#5ef15e" rx="2" ry="2"/>
+<text x="919.3" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.close (2 samples, 0.15%)</title><rect x="916.3" y="291.0" width="1.8" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="919.3" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.socketClose (2 samples, 0.15%)</title><rect x="916.3" y="275.0" width="1.8" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="919.3" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/PlainSocketImpl.socketClose0 (2 samples, 0.15%)</title><rect x="916.3" y="259.0" width="1.8" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="919.3" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/http/impl/conn/PoolingHttpClientConnectionManager.releaseConnection (3 samples, 0.23%)</title><rect x="919.9" y="387.0" width="2.7" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="922.9" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream.takeWhile (2 samples, 0.15%)</title><rect x="923.5" y="691.0" width="1.9" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="926.5" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/invoke/LambdaForm$MH/1268959798.linkToTargetMethod (2 samples, 0.15%)</title><rect x="923.5" y="675.0" width="1.9" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="926.5" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/invoke/LambdaForm$DMH/1608230649.invokeStatic_LL_L (2 samples, 0.15%)</title><rect x="923.5" y="659.0" width="1.9" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="926.5" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/immutable/Stream$$Lambda$3547/1804647048.get$Lambda (2 samples, 0.15%)</title><rect x="923.5" y="643.0" width="1.9" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="926.5" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter$$Lambda$3551/2012237803.apply (5 samples, 0.38%)</title><rect x="926.3" y="883.0" width="4.5" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="929.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hammock/jvm/Interpreter.$anonfun$doReq$6 (5 samples, 0.38%)</title><rect x="926.3" y="867.0" width="4.5" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="929.3" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/ArrayOps$ofRef.map (3 samples, 0.23%)</title><rect x="926.3" y="851.0" width="2.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="929.3" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.map$ (3 samples, 0.23%)</title><rect x="926.3" y="835.0" width="2.7" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="929.3" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.map (3 samples, 0.23%)</title><rect x="926.3" y="819.0" width="2.7" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="929.3" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/ArrayOps$ofRef.foreach (2 samples, 0.15%)</title><rect x="927.2" y="803.0" width="1.8" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="930.2" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach$ (2 samples, 0.15%)</title><rect x="927.2" y="787.0" width="1.8" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="930.2" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach (2 samples, 0.15%)</title><rect x="927.2" y="771.0" width="1.8" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="930.2" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike$$Lambda$6/1908981452.apply (2 samples, 0.15%)</title><rect x="927.2" y="755.0" width="1.8" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="930.2" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableLike.$anonfun$map$1 (2 samples, 0.15%)</title><rect x="927.2" y="739.0" width="1.8" height="15" fill="#44d944" rx="2" ry="2"/>
+<text x="930.2" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/ArrayOps$ofRef.toMap (2 samples, 0.15%)</title><rect x="929.0" y="851.0" width="1.8" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="932.0" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce.toMap$ (2 samples, 0.15%)</title><rect x="929.0" y="835.0" width="1.8" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="932.0" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce.toMap (2 samples, 0.15%)</title><rect x="929.0" y="819.0" width="1.8" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="932.0" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/ArrayOps$ofRef.foreach (2 samples, 0.15%)</title><rect x="929.0" y="803.0" width="1.8" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="932.0" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach$ (2 samples, 0.15%)</title><rect x="929.0" y="787.0" width="1.8" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="932.0" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/IndexedSeqOptimized.foreach (2 samples, 0.15%)</title><rect x="929.0" y="771.0" width="1.8" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="932.0" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce$$Lambda$15/117009527.apply (2 samples, 0.15%)</title><rect x="929.0" y="755.0" width="1.8" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="932.0" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/TraversableOnce.$anonfun$toMap$1 (2 samples, 0.15%)</title><rect x="929.0" y="739.0" width="1.8" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="932.0" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/MapBuilder.$plus$eq (2 samples, 0.15%)</title><rect x="929.0" y="723.0" width="1.8" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="932.0" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/collection/mutable/MapBuilder.$plus$eq (2 samples, 0.15%)</title><rect x="929.0" y="707.0" width="1.8" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="932.0" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (111 samples, 8.53%)</title><rect x="930.8" y="883.0" width="100.6" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="933.8" y="894.0">scala/runtim..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$anon$2$$Lambda$3300/1985902837.apply$mcV$sp (111 samples, 8.53%)</title><rect x="930.8" y="867.0" width="100.6" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="933.8" y="878.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$anon$2.$anonfun$run$3 (111 samples, 8.53%)</title><rect x="930.8" y="851.0" width="100.6" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="933.8" y="862.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$anon$1.renderResponse (111 samples, 8.53%)</title><rect x="930.8" y="835.0" width="100.6" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="933.8" y="846.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/WebSocketSupport.renderResponse$ (111 samples, 8.53%)</title><rect x="930.8" y="819.0" width="100.6" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="933.8" y="830.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/WebSocketSupport.renderResponse (111 samples, 8.53%)</title><rect x="930.8" y="803.0" width="100.6" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="933.8" y="814.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$anon$1.org$http4s$server$blaze$WebSocketSupport$$super$renderResponse (111 samples, 8.53%)</title><rect x="930.8" y="787.0" width="100.6" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="933.8" y="798.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.renderResponse (111 samples, 8.53%)</title><rect x="930.8" y="771.0" width="100.6" height="15" fill="#64f564" rx="2" ry="2"/>
+<text x="933.8" y="782.0">org/http4s/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/internal/package$.unsafeRunAsync (111 samples, 8.53%)</title><rect x="930.8" y="755.0" width="100.6" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="933.8" y="766.0">org/http4s/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/SyncIO.unsafeRunSync (111 samples, 8.53%)</title><rect x="930.8" y="739.0" width="100.6" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="933.8" y="750.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunSync (111 samples, 8.53%)</title><rect x="930.8" y="723.0" width="100.6" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="933.8" y="734.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunTimed (111 samples, 8.53%)</title><rect x="930.8" y="707.0" width="100.6" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="933.8" y="718.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.step (111 samples, 8.53%)</title><rect x="930.8" y="691.0" width="100.6" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="933.8" y="702.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (111 samples, 8.53%)</title><rect x="930.8" y="675.0" width="100.6" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="933.8" y="686.0">scala/runtim..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$Lambda$3184/1360284129.apply$mcV$sp (111 samples, 8.53%)</title><rect x="930.8" y="659.0" width="100.6" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="933.8" y="670.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.$anonfun$runAsync$1 (111 samples, 8.53%)</title><rect x="930.8" y="643.0" width="100.6" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="933.8" y="654.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunAsync (111 samples, 8.53%)</title><rect x="930.8" y="627.0" width="100.6" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="933.8" y="638.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.start (111 samples, 8.53%)</title><rect x="930.8" y="611.0" width="100.6" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="933.8" y="622.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (111 samples, 8.53%)</title><rect x="930.8" y="595.0" width="100.6" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="933.8" y="606.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.start (111 samples, 8.53%)</title><rect x="930.8" y="579.0" width="100.6" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="933.8" y="590.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$$Lambda$2968/875695280.apply (111 samples, 8.53%)</title><rect x="930.8" y="563.0" width="100.6" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="933.8" y="574.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1$adapted (111 samples, 8.53%)</title><rect x="930.8" y="547.0" width="100.6" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="933.8" y="558.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1 (111 samples, 8.53%)</title><rect x="930.8" y="531.0" width="100.6" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="933.8" y="542.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/Async$$$Lambda$3313/1113389227.apply (111 samples, 8.53%)</title><rect x="930.8" y="515.0" width="100.6" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="933.8" y="526.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/Async$.$anonfun$shift$1$adapted (111 samples, 8.53%)</title><rect x="930.8" y="499.0" width="100.6" height="15" fill="#34c934" rx="2" ry="2"/>
+<text x="933.8" y="510.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/Async$.$anonfun$shift$1 (111 samples, 8.53%)</title><rect x="930.8" y="483.0" width="100.6" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="933.8" y="494.0">cats/effect/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (111 samples, 8.53%)</title><rect x="930.8" y="467.0" width="100.6" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="933.8" y="478.0">scala/concur..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (111 samples, 8.53%)</title><rect x="930.8" y="451.0" width="100.6" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="933.8" y="462.0">java/util/co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (111 samples, 8.53%)</title><rect x="930.8" y="435.0" width="100.6" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="933.8" y="446.0">java/util/co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (111 samples, 8.53%)</title><rect x="930.8" y="419.0" width="100.6" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="933.8" y="430.0">java/util/co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (111 samples, 8.53%)</title><rect x="930.8" y="403.0" width="100.6" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="933.8" y="414.0">sun/misc/Uns..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.run (86 samples, 6.61%)</title><rect x="1031.4" y="1059.0" width="77.9" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="1034.4" y="1070.0">scala/con..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$$$Lambda$3314/4803278.apply (78 samples, 5.99%)</title><rect x="1031.4" y="1043.0" width="70.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1034.4" y="1054.0">org/http..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$2$adapted (78 samples, 5.99%)</title><rect x="1031.4" y="1027.0" width="70.7" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="1034.4" y="1038.0">org/http..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$2 (78 samples, 5.99%)</title><rect x="1031.4" y="1011.0" width="70.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1034.4" y="1022.0">org/http..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.apply (78 samples, 5.99%)</title><rect x="1031.4" y="995.0" width="70.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="1034.4" y="1006.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.apply (78 samples, 5.99%)</title><rect x="1031.4" y="979.0" width="70.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1034.4" y="990.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC.execute (78 samples, 5.99%)</title><rect x="1031.4" y="963.0" width="70.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1034.4" y="974.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.execute (78 samples, 5.99%)</title><rect x="1031.4" y="947.0" width="70.7" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="1034.4" y="958.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.startLoop (78 samples, 5.99%)</title><rect x="1031.4" y="931.0" width="70.7" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="1034.4" y="942.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/BlockContext$.withBlockContext (78 samples, 5.99%)</title><rect x="1031.4" y="915.0" width="70.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1034.4" y="926.0">scala/co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (78 samples, 5.99%)</title><rect x="1031.4" y="899.0" width="70.7" height="15" fill="#67f967" rx="2" ry="2"/>
+<text x="1034.4" y="910.0">scala/ru..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline$$Lambda$3012/344338007.apply$mcV$sp (78 samples, 5.99%)</title><rect x="1031.4" y="883.0" width="70.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="1034.4" y="894.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.$anonfun$startLoop$1 (78 samples, 5.99%)</title><rect x="1031.4" y="867.0" width="70.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="1034.4" y="878.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/TrampolineEC$JVMTrampoline.super$startLoop (78 samples, 5.99%)</title><rect x="1031.4" y="851.0" width="70.7" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="1034.4" y="862.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.startLoop (78 samples, 5.99%)</title><rect x="1031.4" y="835.0" width="70.7" height="15" fill="#4de04d" rx="2" ry="2"/>
+<text x="1034.4" y="846.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Trampoline.cats$effect$internals$Trampoline$$immediateLoop (78 samples, 5.99%)</title><rect x="1031.4" y="819.0" width="70.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1034.4" y="830.0">cats/eff..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/Callback$AsyncIdempotentCallback.run (47 samples, 3.61%)</title><rect x="1031.4" y="803.0" width="42.6" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1034.4" y="814.0">cats..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (47 samples, 3.61%)</title><rect x="1031.4" y="787.0" width="42.6" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1034.4" y="798.0">cats..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (47 samples, 3.61%)</title><rect x="1031.4" y="771.0" width="42.6" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1034.4" y="782.0">cats..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.signal (47 samples, 3.61%)</title><rect x="1031.4" y="755.0" width="42.6" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1034.4" y="766.0">cats..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (47 samples, 3.61%)</title><rect x="1031.4" y="739.0" width="42.6" height="15" fill="#52e652" rx="2" ry="2"/>
+<text x="1034.4" y="750.0">cats..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (37 samples, 2.84%)</title><rect x="1032.3" y="723.0" width="33.5" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1035.3" y="734.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.apply (37 samples, 2.84%)</title><rect x="1032.3" y="707.0" width="33.5" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1035.3" y="718.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.signal (37 samples, 2.84%)</title><rect x="1032.3" y="691.0" width="33.5" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1035.3" y="702.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (37 samples, 2.84%)</title><rect x="1032.3" y="675.0" width="33.5" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="1035.3" y="686.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.start (37 samples, 2.84%)</title><rect x="1032.3" y="659.0" width="33.5" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1035.3" y="670.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$$Lambda$2968/875695280.apply (37 samples, 2.84%)</title><rect x="1032.3" y="643.0" width="33.5" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="1035.3" y="654.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1$adapted (37 samples, 2.84%)</title><rect x="1032.3" y="627.0" width="33.5" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1035.3" y="638.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1 (37 samples, 2.84%)</title><rect x="1032.3" y="611.0" width="33.5" height="15" fill="#64f564" rx="2" ry="2"/>
+<text x="1035.3" y="622.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$$$Lambda$3310/1911393170.apply (37 samples, 2.84%)</title><rect x="1032.3" y="595.0" width="33.5" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="1035.3" y="606.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1$adapted (37 samples, 2.84%)</title><rect x="1032.3" y="579.0" width="33.5" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1035.3" y="590.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1 (37 samples, 2.84%)</title><rect x="1032.3" y="563.0" width="33.5" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="1035.3" y="574.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Always.value (37 samples, 2.84%)</title><rect x="1032.3" y="547.0" width="33.5" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1035.3" y="558.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/EntityBodyWriter$$Lambda$3321/9708345.apply (37 samples, 2.84%)</title><rect x="1032.3" y="531.0" width="33.5" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1035.3" y="542.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/EntityBodyWriter.$anonfun$writeEntityBody$1 (37 samples, 2.84%)</title><rect x="1032.3" y="515.0" width="33.5" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1035.3" y="526.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/IdentityWriter.writeEnd (37 samples, 2.84%)</title><rect x="1032.3" y="499.0" width="33.5" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1035.3" y="510.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/IdentityWriter.writeBodyChunk (37 samples, 2.84%)</title><rect x="1032.3" y="483.0" width="33.5" height="15" fill="#41d541" rx="2" ry="2"/>
+<text x="1035.3" y="494.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.channelWrite (37 samples, 2.84%)</title><rect x="1032.3" y="467.0" width="33.5" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1035.3" y="478.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite$ (37 samples, 2.84%)</title><rect x="1032.3" y="451.0" width="33.5" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1035.3" y="462.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite (37 samples, 2.84%)</title><rect x="1032.3" y="435.0" width="33.5" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1035.3" y="446.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/QuietTimeoutStage.writeRequest (37 samples, 2.84%)</title><rect x="1032.3" y="419.0" width="33.5" height="15" fill="#5ef15e" rx="2" ry="2"/>
+<text x="1035.3" y="430.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/TimeoutStageBase.channelWrite (37 samples, 2.84%)</title><rect x="1032.3" y="403.0" width="33.5" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="1035.3" y="414.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite$ (37 samples, 2.84%)</title><rect x="1032.3" y="387.0" width="33.5" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1035.3" y="398.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite (37 samples, 2.84%)</title><rect x="1032.3" y="371.0" width="33.5" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="1035.3" y="382.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage.writeRequest (37 samples, 2.84%)</title><rect x="1032.3" y="355.0" width="33.5" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="1035.3" y="366.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage.writeRequest (37 samples, 2.84%)</title><rect x="1032.3" y="339.0" width="33.5" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1035.3" y="350.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage.writeRequest (37 samples, 2.84%)</title><rect x="1032.3" y="323.0" width="33.5" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1035.3" y="334.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.executeTask (37 samples, 2.84%)</title><rect x="1032.3" y="307.0" width="33.5" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1035.3" y="318.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.enqueueTask (37 samples, 2.84%)</title><rect x="1032.3" y="291.0" width="33.5" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="1035.3" y="302.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueSelectorImpl.wakeup (37 samples, 2.84%)</title><rect x="1032.3" y="275.0" width="33.5" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1035.3" y="286.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (37 samples, 2.84%)</title><rect x="1032.3" y="259.0" width="33.5" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1035.3" y="270.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (37 samples, 2.84%)</title><rect x="1032.3" y="243.0" width="33.5" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1035.3" y="254.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/Function1$$Lambda$35/607932305.apply (8 samples, 0.61%)</title><rect x="1066.7" y="723.0" width="7.3" height="15" fill="#40d440" rx="2" ry="2"/>
+<text x="1069.7" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/Function1.$anonfun$andThen$1 (8 samples, 0.61%)</title><rect x="1066.7" y="707.0" width="7.3" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="1069.7" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$Lambda$3185/310945889.apply (8 samples, 0.61%)</title><rect x="1066.7" y="691.0" width="7.3" height="15" fill="#3bd13b" rx="2" ry="2"/>
+<text x="1069.7" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.$anonfun$runAsync$2$adapted (8 samples, 0.61%)</title><rect x="1066.7" y="675.0" width="7.3" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1069.7" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.$anonfun$runAsync$2 (8 samples, 0.61%)</title><rect x="1066.7" y="659.0" width="7.3" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="1069.7" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunAsyncAndForget (8 samples, 0.61%)</title><rect x="1066.7" y="643.0" width="7.3" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="1069.7" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO.unsafeRunAsync (8 samples, 0.61%)</title><rect x="1066.7" y="627.0" width="7.3" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1069.7" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.start (8 samples, 0.61%)</title><rect x="1066.7" y="611.0" width="7.3" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="1069.7" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (8 samples, 0.61%)</title><rect x="1066.7" y="595.0" width="7.3" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="1069.7" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/runtime/java8/JFunction0$mcV$sp.apply (8 samples, 0.61%)</title><rect x="1066.7" y="579.0" width="7.3" height="15" fill="#4fe24f" rx="2" ry="2"/>
+<text x="1069.7" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$Lambda$3326/550016519.apply$mcV$sp (8 samples, 0.61%)</title><rect x="1066.7" y="563.0" width="7.3" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1069.7" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$renderResponse$7 (8 samples, 0.61%)</title><rect x="1066.7" y="547.0" width="7.3" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="1069.7" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Successful.onComplete (8 samples, 0.61%)</title><rect x="1066.7" y="531.0" width="7.3" height="15" fill="#33c833" rx="2" ry="2"/>
+<text x="1069.7" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Kept.onComplete$ (8 samples, 0.61%)</title><rect x="1066.7" y="515.0" width="7.3" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1069.7" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$KeptPromise$Kept.onComplete (8 samples, 0.61%)</title><rect x="1066.7" y="499.0" width="7.3" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="1069.7" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (8 samples, 0.61%)</title><rect x="1066.7" y="483.0" width="7.3" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1069.7" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$$anon$2.execute (8 samples, 0.61%)</title><rect x="1066.7" y="467.0" width="7.3" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="1069.7" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$ThreadLocalTrampoline.execute (8 samples, 0.61%)</title><rect x="1066.7" y="451.0" width="7.3" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1069.7" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/util/Execution$ThreadLocalTrampoline.run (8 samples, 0.61%)</title><rect x="1066.7" y="435.0" width="7.3" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="1069.7" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.run (8 samples, 0.61%)</title><rect x="1066.7" y="419.0" width="7.3" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1069.7" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$Lambda$3327/621284404.apply (8 samples, 0.61%)</title><rect x="1066.7" y="403.0" width="7.3" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="1069.7" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$renderResponse$8$adapted (8 samples, 0.61%)</title><rect x="1066.7" y="387.0" width="7.3" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1069.7" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$renderResponse$8 (8 samples, 0.61%)</title><rect x="1066.7" y="371.0" width="7.3" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1069.7" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage$$Lambda$3147/951083412.apply (8 samples, 0.61%)</title><rect x="1066.7" y="355.0" width="7.3" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="1069.7" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$handleReqRead$1$adapted (8 samples, 0.61%)</title><rect x="1066.7" y="339.0" width="7.3" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="1069.7" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.$anonfun$handleReqRead$1 (8 samples, 0.61%)</title><rect x="1066.7" y="323.0" width="7.3" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1069.7" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.reqLoopCallback (8 samples, 0.61%)</title><rect x="1066.7" y="307.0" width="7.3" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1069.7" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.liftedTree1$1 (8 samples, 0.61%)</title><rect x="1066.7" y="291.0" width="7.3" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1069.7" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.requestLoop (8 samples, 0.61%)</title><rect x="1066.7" y="275.0" width="7.3" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1069.7" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.channelRead (8 samples, 0.61%)</title><rect x="1066.7" y="259.0" width="7.3" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1069.7" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelRead$ (8 samples, 0.61%)</title><rect x="1066.7" y="243.0" width="7.3" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1069.7" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelRead (8 samples, 0.61%)</title><rect x="1066.7" y="227.0" width="7.3" height="15" fill="#6bfd6b" rx="2" ry="2"/>
+<text x="1069.7" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/QuietTimeoutStage.readRequest (8 samples, 0.61%)</title><rect x="1066.7" y="211.0" width="7.3" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1069.7" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/TimeoutStageBase.channelRead (8 samples, 0.61%)</title><rect x="1066.7" y="195.0" width="7.3" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="1069.7" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelRead$ (8 samples, 0.61%)</title><rect x="1066.7" y="179.0" width="7.3" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="1069.7" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelRead (8 samples, 0.61%)</title><rect x="1066.7" y="163.0" width="7.3" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="1069.7" y="174.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage.readRequest (8 samples, 0.61%)</title><rect x="1066.7" y="147.0" width="7.3" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="1069.7" y="158.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.executeTask (8 samples, 0.61%)</title><rect x="1066.7" y="131.0" width="7.3" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="1069.7" y="142.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.enqueueTask (8 samples, 0.61%)</title><rect x="1066.7" y="115.0" width="7.3" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="1069.7" y="126.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueSelectorImpl.wakeup (8 samples, 0.61%)</title><rect x="1066.7" y="99.0" width="7.3" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="1069.7" y="110.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (8 samples, 0.61%)</title><rect x="1066.7" y="83.0" width="7.3" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1069.7" y="94.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (8 samples, 0.61%)</title><rect x="1066.7" y="67.0" width="7.3" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="1069.7" y="78.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IOBracket$BracketStart.run (31 samples, 2.38%)</title><rect x="1074.0" y="803.0" width="28.1" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="1077.0" y="814.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.startCancelable (31 samples, 2.38%)</title><rect x="1074.0" y="787.0" width="28.1" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="1077.0" y="798.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$.cats$effect$internals$IORunLoop$$loop (31 samples, 2.38%)</title><rect x="1074.0" y="771.0" width="28.1" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1077.0" y="782.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/internals/IORunLoop$RestartCallback.start (31 samples, 2.38%)</title><rect x="1074.0" y="755.0" width="28.1" height="15" fill="#66f766" rx="2" ry="2"/>
+<text x="1077.0" y="766.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$$$Lambda$2968/875695280.apply (31 samples, 2.38%)</title><rect x="1074.0" y="739.0" width="28.1" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="1077.0" y="750.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1$adapted (31 samples, 2.38%)</title><rect x="1074.0" y="723.0" width="28.1" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="1077.0" y="734.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/effect/IO$.$anonfun$async$1 (31 samples, 2.38%)</title><rect x="1074.0" y="707.0" width="28.1" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="1077.0" y="718.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$$$Lambda$3310/1911393170.apply (31 samples, 2.38%)</title><rect x="1074.0" y="691.0" width="28.1" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="1077.0" y="702.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1$adapted (31 samples, 2.38%)</title><rect x="1074.0" y="675.0" width="28.1" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1077.0" y="686.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/syntax/AsyncOps$.$anonfun$fromFuture$1 (31 samples, 2.38%)</title><rect x="1074.0" y="659.0" width="28.1" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1077.0" y="670.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>cats/Always.value (31 samples, 2.38%)</title><rect x="1074.0" y="643.0" width="28.1" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1077.0" y="654.0">ca..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/EntityBodyWriter$$Lambda$3583/1385463525.apply (31 samples, 2.38%)</title><rect x="1074.0" y="627.0" width="28.1" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="1077.0" y="638.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/EntityBodyWriter.$anonfun$writeSink$3 (31 samples, 2.38%)</title><rect x="1074.0" y="611.0" width="28.1" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="1077.0" y="622.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blazecore/util/IdentityWriter.writeBodyChunk (31 samples, 2.38%)</title><rect x="1074.0" y="595.0" width="28.1" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1077.0" y="606.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/server/blaze/Http1ServerStage.channelWrite (31 samples, 2.38%)</title><rect x="1074.0" y="579.0" width="28.1" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="1077.0" y="590.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite$ (31 samples, 2.38%)</title><rect x="1074.0" y="563.0" width="28.1" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1077.0" y="574.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite (31 samples, 2.38%)</title><rect x="1074.0" y="547.0" width="28.1" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="1077.0" y="558.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/QuietTimeoutStage.writeRequest (31 samples, 2.38%)</title><rect x="1074.0" y="531.0" width="28.1" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="1077.0" y="542.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/stages/TimeoutStageBase.channelWrite (31 samples, 2.38%)</title><rect x="1074.0" y="515.0" width="28.1" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="1077.0" y="526.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite$ (31 samples, 2.38%)</title><rect x="1074.0" y="499.0" width="28.1" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="1077.0" y="510.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/pipeline/Tail.channelWrite (31 samples, 2.38%)</title><rect x="1074.0" y="483.0" width="28.1" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1077.0" y="494.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/NIO1HeadStage.writeRequest (31 samples, 2.38%)</title><rect x="1074.0" y="467.0" width="28.1" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1077.0" y="478.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.executeTask (31 samples, 2.38%)</title><rect x="1074.0" y="451.0" width="28.1" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="1077.0" y="462.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/http4s/blaze/channel/nio1/SelectorLoop.enqueueTask (31 samples, 2.38%)</title><rect x="1074.0" y="435.0" width="28.1" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="1077.0" y="446.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueSelectorImpl.wakeup (31 samples, 2.38%)</title><rect x="1074.0" y="419.0" width="28.1" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="1077.0" y="430.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (31 samples, 2.38%)</title><rect x="1074.0" y="403.0" width="28.1" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="1077.0" y="414.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/KQueueArrayWrapper.interrupt (31 samples, 2.38%)</title><rect x="1074.0" y="387.0" width="28.1" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="1077.0" y="398.0">su..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$$Lambda$3325/2032131739.apply (8 samples, 0.61%)</title><rect x="1102.1" y="1043.0" width="7.2" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1105.1" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise.$anonfun$transform$1 (8 samples, 0.61%)</title><rect x="1102.1" y="1027.0" width="7.2" height="15" fill="#48dd48" rx="2" ry="2"/>
+<text x="1105.1" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.complete (8 samples, 0.61%)</title><rect x="1102.1" y="1011.0" width="7.2" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1105.1" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete$ (8 samples, 0.61%)</title><rect x="1102.1" y="995.0" width="7.2" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="1105.1" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/Promise.complete (8 samples, 0.61%)</title><rect x="1102.1" y="979.0" width="7.2" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1105.1" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.tryComplete (8 samples, 0.61%)</title><rect x="1102.1" y="963.0" width="7.2" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1105.1" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1$adapted (8 samples, 0.61%)</title><rect x="1102.1" y="947.0" width="7.2" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1105.1" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/Promise$DefaultPromise.$anonfun$tryComplete$1 (8 samples, 0.61%)</title><rect x="1102.1" y="931.0" width="7.2" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1105.1" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/CallbackRunnable.executeWithValue (8 samples, 0.61%)</title><rect x="1102.1" y="915.0" width="7.2" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1105.1" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>scala/concurrent/impl/ExecutionContextImpl.execute (8 samples, 0.61%)</title><rect x="1102.1" y="899.0" width="7.2" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1105.1" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.execute (8 samples, 0.61%)</title><rect x="1102.1" y="883.0" width="7.2" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="1105.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.externalPush (8 samples, 0.61%)</title><rect x="1102.1" y="867.0" width="7.2" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1105.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.signalWork (8 samples, 0.61%)</title><rect x="1102.1" y="851.0" width="7.2" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="1105.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (8 samples, 0.61%)</title><rect x="1102.1" y="835.0" width="7.2" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="1105.1" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ForkJoinPool.awaitWork (88 samples, 6.76%)</title><rect x="1109.3" y="1107.0" width="79.8" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1112.3" y="1118.0">java/util..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.park (88 samples, 6.76%)</title><rect x="1109.3" y="1091.0" width="79.8" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="1112.3" y="1102.0">sun/misc/..</text>
+</g>
+</svg>
