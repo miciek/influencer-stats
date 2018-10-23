@@ -10,6 +10,7 @@ import io.circe.Decoder
 import io.circe.generic.auto._
 import org.http4s.EntityDecoder
 import org.http4s.circe._
+import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.server.blaze.BlazeBuilder
 
@@ -25,7 +26,7 @@ object Main extends IOApp {
   val state = TrieMap.empty[String, Collection]
   val ec    = scala.concurrent.ExecutionContext.global
 
-  def getInfluencerResults(id: String): IO[InfluencerResults] = {
+  def getInfluencerResults(client: Client[IO])(id: String): IO[InfluencerResults] = {
     implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
 
     val youtubeResponses: IO[List[youtube.VideoListResponse]] =
@@ -33,9 +34,7 @@ object Main extends IOApp {
         .mapValues(_.videos)
         .getOrElse(id, List.empty)
         .map { videoId =>
-          BlazeClientBuilder[IO](ec).resource.use { client =>
-            client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
-          }
+          client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
         }
         .sequence
 
@@ -44,14 +43,16 @@ object Main extends IOApp {
       .map(Statistics.calculate)
   }
 
-  val service = new HttpService(getInfluencerResults, state.get, state.put)
-
-  override def run(args: List[String]): IO[ExitCode] =
-    BlazeBuilder[IO]
-      .bindHttp(port, host)
-      .mountService(service.routes, "/")
-      .serve
-      .compile
-      .drain
+  override def run(args: List[String]): IO[ExitCode] = {
+    (for {
+      client  <- BlazeClientBuilder[IO](ec).stream
+      service = new HttpService(getInfluencerResults(client), state.get, state.put)
+      result <- BlazeBuilder[IO]
+                 .bindHttp(port, host)
+                 .mountService(service.routes, "/")
+                 .withNio2(isNio2 = true)
+                 .serve
+    } yield result).compile.drain
       .as(ExitCode.Success)
+  }
 }
