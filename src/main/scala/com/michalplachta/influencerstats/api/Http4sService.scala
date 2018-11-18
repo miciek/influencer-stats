@@ -8,9 +8,9 @@ import org.http4s.circe._
 import org.http4s.dsl.io._
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes}
 
-class HttpService(getResults: String => IO[InfluencerResults],
-                  getCollection: String => Option[Collection],
-                  saveCollection: (String, Collection) => Unit) {
+class Http4sService(getResults: String => IO[InfluencerResults],
+                    getCollection: String => Option[Collection],
+                    saveCollection: (String, Collection) => Unit) {
   implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
   implicit def jsonEncoder[F[_]: Sync, A <: Product: Encoder]: EntityEncoder[F, A] = jsonEncoderOf[F, A]
 

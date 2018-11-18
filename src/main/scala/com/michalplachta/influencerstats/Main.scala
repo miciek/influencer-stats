@@ -1,33 +1,27 @@
 package com.michalplachta.influencerstats
 
-import cats.{Functor, Monad}
-import cats.effect.{ExitCode, IO, IOApp, Sync}
+import akka.actor.ActorSystem
+import akka.http.scaladsl.server.{HttpApp, Route}
+import cats.effect.IO
 import cats.implicits._
 import cats.mtl.{DefaultFunctorTell, FunctorTell}
+import cats.{Functor, Monad}
+import com.michalplachta.influencerstats.api._
 import com.michalplachta.influencerstats.api.youtube.VideoListResponse
-import com.michalplachta.influencerstats.api.{youtube, Collection, HttpService}
+import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
 import com.typesafe.config.ConfigFactory
-import io.circe.Decoder
-import io.circe.generic.auto._
-import org.http4s.EntityDecoder
-import org.http4s.circe._
-import org.http4s.client.Client
-import org.http4s.client.blaze.BlazeClientBuilder
-import org.http4s.server.blaze.BlazeBuilder
 
 import scala.collection.concurrent.TrieMap
 
-object Main extends IOApp {
+object Main extends App {
   val config        = ConfigFactory.load()
   val host          = config.getString("app.host")
   val port          = config.getInt("app.port")
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
-
-  val state = TrieMap.empty[String, Collection]
-  val ec    = scala.concurrent.ExecutionContext.global
+  val state         = TrieMap.empty[String, Collection]
 
   def getInfluencerResults[F[_]: Monad](
       getVideoListResponse: String => F[VideoListResponse]
@@ -49,30 +43,30 @@ object Main extends IOApp {
       }
   }
 
-  override def run(args: List[String]): IO[ExitCode] = {
-    def getVideoListResponse(client: Client[IO])(videoId: String): IO[VideoListResponse] = {
-      implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
-      client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
-    }
-
-    implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
-      override val functor = Functor[IO]
-      override def tell(l: String) = {
-        IO {
-          println(s"LOG: $l")
-        }
+  implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
+    override val functor = Functor[IO]
+    override def tell(l: String) = {
+      IO {
+        println(s"LOG: $l")
       }
     }
-
-    (for {
-      client  <- BlazeClientBuilder[IO](ec).stream
-      service = new HttpService(getInfluencerResults(getVideoListResponse(client)), state.get, state.put)
-      result <- BlazeBuilder[IO]
-                 .bindHttp(port, host)
-                 .mountService(service.routes, "/")
-                 .withNio2(isNio2 = true)
-                 .serve
-    } yield result).compile.drain
-      .as(ExitCode.Success)
   }
+
+  def akkaHttpServer: IO[Unit] = IO {
+    implicit val system = ActorSystem("influencer-stats")
+
+    val httpApp = new HttpApp {
+      override protected def routes: Route =
+        Route.seal(
+          AkkaHttpRoutes.getInfluencerResults(
+            getInfluencerResults(AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey))
+          ) ~
+          AkkaHttpRoutes.getCollection(state.get) ~
+          AkkaHttpRoutes.putCollection(state.put)
+        )
+    }
+    httpApp.startServer(host, port)
+  }
+
+  akkaHttpServer.unsafeRunSync()
 }
