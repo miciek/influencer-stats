@@ -1,7 +1,6 @@
 package com.michalplachta.influencerstats
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.server.{HttpApp, Route}
 import cats.effect.IO
 import cats.implicits._
 import cats.mtl.{DefaultFunctorTell, FunctorTell}
@@ -48,25 +47,19 @@ object Main extends App {
     override def tell(l: String) = {
       IO {
         println(s"LOG: $l")
+        println(s"LOG: $l")
       }
     }
   }
 
-  def akkaHttpServer: IO[Unit] = IO {
-    implicit val system = ActorSystem("influencer-stats")
-
-    val httpApp = new HttpApp {
-      override protected def routes: Route =
-        Route.seal(
-          AkkaHttpRoutes.getInfluencerResults(
-            getInfluencerResults(AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey))
-          ) ~
-          AkkaHttpRoutes.getCollection(state.get) ~
-          AkkaHttpRoutes.putCollection(state.put)
-        )
-    }
-    httpApp.startServer(host, port)
-  }
-
-  akkaHttpServer.unsafeRunSync()
+  implicit val system: ActorSystem = ActorSystem("influencer-stats")
+  AkkaHttpServer
+    .akkaHttpServer(
+      host,
+      port,
+      getInfluencerResults(AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)),
+      state.get,
+      state.put
+    )
+    .unsafeRunSync()
 }

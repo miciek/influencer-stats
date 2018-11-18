@@ -11,8 +11,8 @@ import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 
 object AkkaHttpClient {
   def getVideoListResponse(youtubeUri: String, youtubeApiKey: String)(
-      videoId: String
-  )(implicit system: ActorSystem): IO[VideoListResponse] = {
+      implicit system: ActorSystem
+  ): String => IO[VideoListResponse] = { videoId =>
     import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
     import io.circe.generic.auto._
 
