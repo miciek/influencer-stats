@@ -1,8 +1,9 @@
 package com.michalplachta.influencerstats
 
-import cats.Applicative
+import cats.{Functor, Monad}
 import cats.effect.{ExitCode, IO, IOApp, Sync}
 import cats.implicits._
+import cats.mtl.{DefaultFunctorTell, FunctorTell}
 import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.api.{youtube, Collection, HttpService}
 import com.michalplachta.influencerstats.core.Statistics
@@ -28,9 +29,9 @@ object Main extends IOApp {
   val state = TrieMap.empty[String, Collection]
   val ec    = scala.concurrent.ExecutionContext.global
 
-  def getInfluencerResults[F[_]: Applicative](
+  def getInfluencerResults[F[_]: Monad](
       getVideoListResponse: String => F[VideoListResponse]
-  )(id: String): F[InfluencerResults] = {
+  )(id: String)(implicit F: FunctorTell[F, String]): F[InfluencerResults] = {
     val youtubeResponses: F[List[youtube.VideoListResponse]] =
       state
         .mapValues(_.videos)
@@ -39,14 +40,28 @@ object Main extends IOApp {
         .sequence
 
     youtubeResponses
+      .flatMap { responses =>
+        F.tell(s"got responses: $responses").map(_ => responses)
+      }
       .map(_.flatMap(_.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))))
-      .map(Statistics.calculate)
+      .flatMap { items =>
+        F.tell(s"got list of influencer items: $items").map(_ => Statistics.calculate(items))
+      }
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
     def getVideoListResponse(client: Client[IO])(videoId: String): IO[VideoListResponse] = {
       implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
       client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
+    }
+
+    implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
+      override val functor = Functor[IO]
+      override def tell(l: String) = {
+        IO {
+          println(s"LOG: $l")
+        }
+      }
     }
 
     (for {
