@@ -32,9 +32,12 @@ class HttpService(getResults: String => IO[InfluencerResults],
         }
 
     case GET -> Root / "collections" / collectionId / "stats" =>
-      getResults(collectionId)
-        .flatMap { results =>
-          Ok(results)
+      getResults(collectionId).attempt
+        .flatMap {
+          case Right(results) => Ok(results)
+          case Left(ex) =>
+            println(s"error thrown: $ex")
+            InternalServerError()
         }
   }
 }

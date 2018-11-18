@@ -1,7 +1,9 @@
 package com.michalplachta.influencerstats
 
+import cats.Applicative
 import cats.effect.{ExitCode, IO, IOApp, Sync}
 import cats.implicits._
+import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.api.{youtube, Collection, HttpService}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
@@ -26,16 +28,14 @@ object Main extends IOApp {
   val state = TrieMap.empty[String, Collection]
   val ec    = scala.concurrent.ExecutionContext.global
 
-  def getInfluencerResults(client: Client[IO])(id: String): IO[InfluencerResults] = {
-    implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
-
-    val youtubeResponses: IO[List[youtube.VideoListResponse]] =
+  def getInfluencerResults[F[_]: Applicative](
+      getVideoListResponse: String => F[VideoListResponse]
+  )(id: String): F[InfluencerResults] = {
+    val youtubeResponses: F[List[youtube.VideoListResponse]] =
       state
         .mapValues(_.videos)
         .getOrElse(id, List.empty)
-        .map { videoId =>
-          client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
-        }
+        .map(getVideoListResponse)
         .sequence
 
     youtubeResponses
@@ -44,9 +44,14 @@ object Main extends IOApp {
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
+    def getVideoListResponse(client: Client[IO])(videoId: String): IO[VideoListResponse] = {
+      implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
+      client.expect[youtube.VideoListResponse](s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey")
+    }
+
     (for {
       client  <- BlazeClientBuilder[IO](ec).stream
-      service = new HttpService(getInfluencerResults(client), state.get, state.put)
+      service = new HttpService(getInfluencerResults(getVideoListResponse(client)), state.get, state.put)
       result <- BlazeBuilder[IO]
                  .bindHttp(port, host)
                  .mountService(service.routes, "/")
