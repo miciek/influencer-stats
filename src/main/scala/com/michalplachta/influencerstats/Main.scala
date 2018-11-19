@@ -24,23 +24,22 @@ object Main extends App {
   val state         = TrieMap.empty[String, Collection]
 
   def getInfluencerResults[F[_]: Monad](
-      getVideoListResponse: String => F[VideoListResponse]
+      fetchCollection: String => F[Option[Collection]],
+      fetchVideoListResponse: String => F[VideoListResponse]
   )(id: String)(implicit F: FunctorTell[F, String]): F[InfluencerResults] = {
-    val youtubeResponses: F[List[youtube.VideoListResponse]] =
-      state
-        .mapValues(_.videos)
-        .getOrElse(id, List.empty)
-        .map(getVideoListResponse)
-        .sequence
-
-    youtubeResponses
-      .flatMap { responses =>
-        F.tell(s"got responses: $responses").map(_ => responses)
-      }
-      .map(_.flatMap(_.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))))
-      .flatMap { items =>
-        F.tell(s"got list of influencer items: $items").map(_ => Statistics.calculate(items))
-      }
+    for {
+      _          <- F.tell(s"trying to fetch collection with id $id")
+      collection <- fetchCollection(id)
+      _          <- F.tell(s"fetched collection: $collection")
+      videoIds   = collection.map(_.videos).getOrElse(List.empty)
+      _          <- F.tell(s"going to make ${videoIds.size} fetches")
+      responses  <- videoIds.map(fetchVideoListResponse).sequence
+      _          <- F.tell(s"got responses: $responses")
+      items = responses.flatMap(
+        _.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))
+      )
+      _ <- F.tell(s"got list of influencer items: $items")
+    } yield Statistics.calculate(items)
   }
 
   implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
@@ -59,7 +58,10 @@ object Main extends App {
     .akkaHttpServer(
       host,
       port,
-      getInfluencerResults(AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)),
+      getInfluencerResults(
+        id => IO(state.get(id)),
+        AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)
+      ),
       state.get,
       state.put
     )
