@@ -10,10 +10,9 @@ import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
+import com.michalplachta.influencerstats.state.InMemMapState
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
-
-import scala.collection.concurrent.TrieMap
 
 object Main extends App {
   val config        = ConfigFactory.load()
@@ -21,7 +20,6 @@ object Main extends App {
   val port          = config.getInt("app.port")
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
-  val state         = TrieMap.empty[String, Collection]
 
   def getInfluencerResults[F[_]: Monad](
       fetchCollection: String => F[Option[Collection]],
@@ -59,11 +57,11 @@ object Main extends App {
       host,
       port,
       getInfluencerResults(
-        id => IO(state.get(id)),
+        InMemMapState.fetchCollection[IO],
         AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)
       ),
-      state.get,
-      state.put
+      InMemMapState.state.get,
+      InMemMapState.state.put
     )
     .unsafeRunSync()
 }
