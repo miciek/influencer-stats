@@ -27,17 +27,10 @@ class Http4sService(getResults: String => IO[InfluencerResults],
         .map { collection =>
           saveCollection(collectionId, collection)
         }
-        .flatMap { _ =>
-          Ok()
-        }
+        .flatMap(Ok(_))
 
     case GET -> Root / "collections" / collectionId / "stats" =>
-      getResults(collectionId).attempt
-        .flatMap {
-          case Right(results) => Ok(results)
-          case Left(ex) =>
-            println(s"error thrown: $ex")
-            InternalServerError()
-        }
+      getResults(collectionId)
+        .flatMap(Ok(_))
   }
 }

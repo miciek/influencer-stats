@@ -11,6 +11,7 @@ import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
 import com.typesafe.config.ConfigFactory
+import org.slf4j.LoggerFactory
 
 import scala.collection.concurrent.TrieMap
 
@@ -43,11 +44,12 @@ object Main extends App {
   }
 
   implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
+    private val logger = LoggerFactory.getLogger("io-logger")
+
     override val functor = Functor[IO]
-    override def tell(l: String) = {
+    override def tell(msg: String) = {
       IO {
-        println(s"LOG: $l")
-        println(s"LOG: $l")
+        logger.info(msg)
       }
     }
   }
