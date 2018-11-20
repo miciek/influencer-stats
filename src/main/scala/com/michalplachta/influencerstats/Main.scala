@@ -10,7 +10,7 @@ import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
-import com.michalplachta.influencerstats.state.InMemMapState
+import com.michalplachta.influencerstats.state.InMemListState
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 
@@ -52,16 +52,23 @@ object Main extends App {
   }
 
   implicit val system: ActorSystem = ActorSystem("influencer-stats")
+  val state                        = new InMemListState[IO]
+
+  (1 to 10000).map(id => (id.toString, Collection(List.empty))).foreach {
+    case (id, collection) =>
+      state.saveCollection(id, collection).unsafeRunSync()
+  }
+
   AkkaHttpServer
     .akkaHttpServer(
       host,
       port,
       getInfluencerResults(
-        InMemMapState.fetchCollection[IO],
+        state.fetchCollection,
         AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)
       ),
-      InMemMapState.state.get,
-      InMemMapState.state.put
+      state.fetchCollection,
+      state.saveCollection
     )
     .unsafeRunSync()
 }

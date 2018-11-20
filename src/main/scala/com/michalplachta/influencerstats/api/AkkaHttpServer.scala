@@ -9,8 +9,8 @@ object AkkaHttpServer {
   def akkaHttpServer(host: String,
                      port: Int,
                      getResults: String => IO[InfluencerResults],
-                     getCollection: String => Option[Collection],
-                     saveCollection: (String, Collection) => Unit)(implicit system: ActorSystem): IO[Unit] = IO {
+                     getCollection: String => IO[Option[Collection]],
+                     saveCollection: (String, Collection) => IO[Unit])(implicit system: ActorSystem): IO[Unit] = IO {
     val httpApp = new HttpApp {
       override protected def routes: Route =
         Route.seal(

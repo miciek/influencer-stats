@@ -7,13 +7,20 @@ import com.michalplachta.influencerstats.api.Collection
 
 import scala.collection.concurrent.TrieMap
 
-object InMemMapState {
+class InMemMapState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) {
   val state = TrieMap.empty[String, Collection]
 
-  def fetchCollection[F[_]: Monad: Async](id: String)(implicit F: FunctorTell[F, String]): F[Option[Collection]] = {
+  def fetchCollection(id: String): F[Option[Collection]] = {
     for {
       _      <- F.tell(s"looking for collection with id $id")
       result <- Async[F].delay(state.get(id))
     } yield result
+  }
+
+  def saveCollection(id: String, collection: Collection): F[Unit] = {
+    for {
+      _ <- F.tell(s"saving collection $collection under id $id")
+      _ <- Async[F].delay(state.put(id, collection))
+    } yield ()
   }
 }

@@ -19,6 +19,7 @@ lazy val root = (project in file("."))
       "com.pepegar"       %% "hammock-core"         % "0.8.+",
       "com.pepegar"       %% "hammock-circe"        % "0.8.+",
       "de.heikoseeberger" %% "akka-http-circe"      % "1.22.+",
+      "io.monix"          %% "monix-execution"      % "2.3.+",
       "ch.qos.logback"    % "logback-classic"       % "1.2.+",
       "org.scalatest"     %% "scalatest"            % "3.0.+" % Test,
       "com.typesafe.akka" %% "akka-http-testkit"    % "10.1.+" % Test

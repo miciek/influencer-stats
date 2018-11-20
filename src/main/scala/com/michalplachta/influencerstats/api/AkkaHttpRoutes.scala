@@ -16,21 +16,22 @@ object AkkaHttpRoutes extends Directives {
     }
   }
 
-  def putCollection(saveCollection: (String, Collection) => Unit): Route = {
+  def putCollection(saveCollection: (String, Collection) => IO[Unit]): Route = {
     path("collections" / Segment) { collectionId =>
       put {
         entity(as[Collection]) { collection =>
-          saveCollection(collectionId, collection)
-          complete(StatusCodes.Created)
+          onSuccess(saveCollection(collectionId, collection).unsafeToFuture) {
+            complete(StatusCodes.Created)
+          }
         }
       }
     }
   }
 
-  def getCollection(getCollection: String => Option[Collection]): Route = {
+  def getCollection(getCollection: String => IO[Option[Collection]]): Route = {
     path("collections" / Segment) { collectionId =>
       get {
-        getCollection(collectionId) match {
+        onSuccess(getCollection(collectionId).unsafeToFuture) {
           case Some(collection) =>
             complete((StatusCodes.OK, collection))
           case None =>

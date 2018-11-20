@@ -75,21 +75,22 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
 ### Version 1 (akka-http server/client + Futures)
 ```
-> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 1 connections
+> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  1 threads and 16 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     2.35ms    5.18ms 124.55ms   93.29%
-    Req/Sec   736.72    127.18     1.00k    72.00%
+    Latency     2.35s   214.19ms   2.83s    60.82%
+    Req/Sec    22.90     22.91   117.00     83.10%
   Latency Distribution
-     50%    1.15ms
-     75%    1.35ms
-     90%    3.47ms
-     99%   18.98ms
-  44032 requests in 1.00m, 7.98MB read
-Requests/sec:    733.20
-Transfer/sec:    136.04KB
+     50%    2.29s
+     75%    2.55s
+     90%    2.64s
+     99%    2.82s
+  194 requests in 30.07s, 36.00KB read
+Requests/sec:      6.45
+Transfer/sec:      1.20KB
 ```
+
 ### Version 2 (akka-http/Hammock + IO)
 ```
 > wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
