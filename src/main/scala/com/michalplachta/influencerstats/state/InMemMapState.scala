@@ -3,7 +3,7 @@ import cats.Monad
 import cats.effect.Async
 import cats.mtl.FunctorTell
 import cats.implicits._
-import com.michalplachta.influencerstats.api.Collection
+import com.michalplachta.influencerstats.core.model.Collection
 
 import scala.collection.concurrent.TrieMap
 

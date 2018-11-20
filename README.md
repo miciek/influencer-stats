@@ -76,19 +76,19 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 ### Version 1 (log-all/list-state/akka-http)
 ```
 > wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 16 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     2.35s   214.19ms   2.83s    60.82%
-    Req/Sec    22.90     22.91   117.00     83.10%
-  Latency Distribution
-     50%    2.29s
-     75%    2.55s
-     90%    2.64s
-     99%    2.82s
-  194 requests in 30.07s, 36.00KB read
-Requests/sec:      6.45
-Transfer/sec:      1.20KB
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency     2.46s   219.22ms   3.39s    76.32%
+      Req/Sec    14.35     12.33    59.00     71.58%
+    Latency Distribution
+       50%    2.40s
+       75%    2.55s
+       90%    2.85s
+       99%    3.35s
+    190 requests in 30.06s, 35.25KB read
+  Requests/sec:      6.32
+  Transfer/sec:      1.17KB
 ```
 
 ### Version 2 (akka-http/Hammock + IO)

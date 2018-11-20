@@ -1,7 +1,7 @@
 package com.michalplachta.influencerstats.api
 
 import cats.effect._
-import com.michalplachta.influencerstats.core.model.InfluencerResults
+import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
 import io.circe.generic.auto._
 import io.circe.{Decoder, Encoder}
 import org.http4s.circe._

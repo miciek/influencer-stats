@@ -4,7 +4,7 @@ import cats.Monad
 import cats.effect.Async
 import cats.implicits._
 import cats.mtl.FunctorTell
-import com.michalplachta.influencerstats.api.Collection
+import com.michalplachta.influencerstats.core.model.Collection
 import monix.execution.atomic.Atomic
 
 class InMemListState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) {

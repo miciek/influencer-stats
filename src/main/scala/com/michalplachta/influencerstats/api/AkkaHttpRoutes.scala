@@ -3,7 +3,7 @@ package com.michalplachta.influencerstats.api
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, Route}
 import cats.effect.IO
-import com.michalplachta.influencerstats.core.model.InfluencerResults
+import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.auto._
 

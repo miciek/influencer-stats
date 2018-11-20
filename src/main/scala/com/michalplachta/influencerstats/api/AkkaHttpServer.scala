@@ -3,7 +3,7 @@ package com.michalplachta.influencerstats.api
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.{HttpApp, Route}
 import cats.effect._
-import com.michalplachta.influencerstats.core.model.InfluencerResults
+import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
 
 object AkkaHttpServer {
   def akkaHttpServer(host: String,

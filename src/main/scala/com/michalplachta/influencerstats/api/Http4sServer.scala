@@ -2,7 +2,7 @@ package com.michalplachta.influencerstats.api
 
 import cats.effect._
 import cats.implicits._
-import com.michalplachta.influencerstats.core.model.InfluencerResults
+import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
 import org.http4s.client.Client
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.server.blaze.BlazeBuilder

@@ -1,4 +1,8 @@
 package com.michalplachta.influencerstats.core
+import cats.Monad
+import cats.implicits._
+import cats.mtl.FunctorTell
+import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.core.model._
 
 object Statistics {
@@ -11,4 +15,24 @@ object Statistics {
       )
     }
   }
+
+  def getInfluencerResults[F[_]: Monad](
+      fetchCollection: String => F[Option[Collection]],
+      fetchVideoListResponse: String => F[VideoListResponse]
+  )(id: String)(implicit F: FunctorTell[F, String]): F[InfluencerResults] = {
+    for {
+      _          <- F.tell(s"trying to fetch collection with id $id")
+      collection <- fetchCollection(id)
+      _          <- F.tell(s"fetched collection: $collection")
+      videoIds   = collection.map(_.videos).getOrElse(List.empty)
+      _          <- F.tell(s"going to make ${videoIds.size} fetches")
+      responses  <- videoIds.map(fetchVideoListResponse).sequence
+      _          <- F.tell(s"got responses: $responses")
+      items = responses.flatMap(
+        _.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))
+      )
+      _ <- F.tell(s"got list of influencer items: $items")
+    } yield calculate(items)
+  }
+
 }
