@@ -8,7 +8,7 @@ import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
-import com.michalplachta.influencerstats.state.InMemListState
+import com.michalplachta.influencerstats.state.InMemMapState
 import com.typesafe.config.ConfigFactory
 
 object Main extends App {
@@ -21,7 +21,7 @@ object Main extends App {
   implicit val system: ActorSystem              = ActorSystem("influencer-stats")
   implicit val logging: FunctorTell[IO, String] = new IoLogger
 
-  val state = new InMemListState[IO]
+  val state = new InMemMapState[IO]
 
   (1 to 10000).map(id => (id.toString, Collection(List.empty))).foreach {
     case (id, collection) =>

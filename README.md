@@ -127,23 +127,22 @@ Transfer/sec:     11.33KB
   Transfer/sec:     58.02KB
 ```
 
-### Version 4 (http4s + IO)
+### Version 4 (logs-max-1kps-array/triemap-state/akka-http)
 ```
-> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 1 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     2.54ms    1.82ms  26.75ms   85.22%
-    Req/Sec   386.28    291.05     1.05k    77.48%
-  Latency Distribution
-     50%    1.12ms
-     75%    4.18ms
-     90%    4.50ms
-     99%    5.83ms
-  11638 requests in 1.00m, 1.51MB read
-  Non-2xx or 3xx responses: 6289
-Requests/sec:    193.81
-Transfer/sec:     25.82KB
+> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency    13.98ms   13.24ms 152.48ms   92.64%
+      Req/Sec     1.35k   324.33     1.85k    75.25%
+    Latency Distribution
+       50%   10.44ms
+       75%   12.79ms
+       90%   19.87ms
+       99%   86.41ms
+    40329 requests in 30.02s, 7.31MB read
+  Requests/sec:   1343.54
+  Transfer/sec:    249.29KB
 ```
 
 ### Version 5 (http4s + IO - fix: just one client)
