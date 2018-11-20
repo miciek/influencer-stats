@@ -1,24 +1,22 @@
 package com.michalplachta.influencerstats
 
-import akka.actor.ActorSystem
-import cats.effect.IO
+import cats.effect.{IO, IOApp}
 import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.api._
-import com.michalplachta.influencerstats.clients.AkkaHttpClient
+import com.michalplachta.influencerstats.clients.Http4sClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
 import com.michalplachta.influencerstats.state.InMemMapState
 import com.typesafe.config.ConfigFactory
 
-object Main extends App {
+object Main extends IOApp {
   val config        = ConfigFactory.load()
   val host          = config.getString("app.host")
   val port          = config.getInt("app.port")
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
-  implicit val system: ActorSystem              = ActorSystem("influencer-stats")
   implicit val logging: FunctorTell[IO, String] = new IoLogger
 
   val state = new InMemMapState[IO]
@@ -28,16 +26,18 @@ object Main extends App {
       state.saveCollection(id, collection).unsafeRunSync()
   }
 
-  AkkaHttpServer
-    .akkaHttpServer(
-      host,
-      port,
-      Statistics.getInfluencerResults(
+  override def run(args: List[String]) = {
+    Http4sServer
+      .http4sServer(
+        host,
+        port,
+        client =>
+          Statistics.getInfluencerResults(
+            state.fetchCollection,
+            Http4sClient.getVideoListResponse(client, youtubeUri, youtubeApiKey)
+        ),
         state.fetchCollection,
-        AkkaHttpClient.getVideoListResponse(youtubeUri, youtubeApiKey)
-      ),
-      state.fetchCollection,
-      state.saveCollection
-    )
-    .unsafeRunSync()
+        state.saveCollection
+      )
+  }
 }

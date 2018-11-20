@@ -9,14 +9,14 @@ import org.http4s.dsl.io._
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes}
 
 class Http4sService(getResults: String => IO[InfluencerResults],
-                    getCollection: String => Option[Collection],
-                    saveCollection: (String, Collection) => Unit) {
+                    getCollection: String => IO[Option[Collection]],
+                    saveCollection: (String, Collection) => IO[Unit]) {
   implicit def jsonDecoder[F[_]: Sync, A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
   implicit def jsonEncoder[F[_]: Sync, A <: Product: Encoder]: EntityEncoder[F, A] = jsonEncoderOf[F, A]
 
   val routes = HttpRoutes.of[IO] {
     case GET -> Root / "collections" / collectionId =>
-      getCollection(collectionId) match {
+      getCollection(collectionId).flatMap {
         case Some(collection) => Ok(collection)
         case None             => NotFound()
       }
@@ -24,7 +24,7 @@ class Http4sService(getResults: String => IO[InfluencerResults],
     case req @ PUT -> Root / "collections" / collectionId =>
       req
         .as[Collection]
-        .map { collection =>
+        .flatMap { collection =>
           saveCollection(collectionId, collection)
         }
         .flatMap(Ok(_))

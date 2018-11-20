@@ -94,19 +94,19 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 ### Version 2 (logs-max-1kps-list/list-state/akka-http)
 ```
 > wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 16 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   261.43ms   97.92ms 760.70ms   70.47%
-    Req/Sec    61.60     26.42   150.00     68.60%
-  Latency Distribution
-     50%  256.15ms
-     75%  317.90ms
-     90%  389.43ms
-     99%  551.64ms
-  1832 requests in 30.01s, 339.92KB read
-Requests/sec:     61.05
-Transfer/sec:     11.33KB
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency   261.43ms   97.92ms 760.70ms   70.47%
+      Req/Sec    61.60     26.42   150.00     68.60%
+    Latency Distribution
+       50%  256.15ms
+       75%  317.90ms
+       90%  389.43ms
+       99%  551.64ms
+    1832 requests in 30.01s, 339.92KB read
+  Requests/sec:     61.05
+  Transfer/sec:     11.33KB
 ```
 
 ### Version 3 (logs-max-1kps-array/list-state/akka-http)
@@ -145,20 +145,20 @@ Transfer/sec:     11.33KB
   Transfer/sec:    249.29KB
 ```
 
-### Version 5 (http4s + IO - fix: just one client)
+### Version 5 (logs-max-1kps-array/triemap-state/http4s)
 ```
-> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 1 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     1.69ms  485.81us  19.99ms   94.23%
-    Req/Sec   599.17     47.29   700.00     83.67%
-  Latency Distribution
-     50%    1.59ms
-     75%    1.70ms
-     90%    1.90ms
-     99%    3.00ms
-  35789 requests in 1.00m, 5.60MB read
-Requests/sec:    596.22
-Transfer/sec:     95.49KB
+> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency    30.36ms  103.88ms   1.01s    96.19%
+      Req/Sec     1.39k   242.95     1.71k    87.41%
+    Latency Distribution
+       50%   11.01ms
+       75%   12.66ms
+       90%   16.42ms
+       99%  696.71ms
+    39701 requests in 30.05s, 6.21MB read
+  Requests/sec:   1320.96
+  Transfer/sec:    211.56KB
 ```

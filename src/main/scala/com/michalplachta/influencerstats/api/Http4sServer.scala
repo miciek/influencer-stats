@@ -11,8 +11,8 @@ object Http4sServer {
   def http4sServer(host: String,
                    port: Int,
                    getResults: Client[IO] => String => IO[InfluencerResults],
-                   getCollection: String => Option[Collection],
-                   saveCollection: (String, Collection) => Unit)(implicit F: ConcurrentEffect[IO]): IO[ExitCode] = {
+                   getCollection: String => IO[Option[Collection]],
+                   saveCollection: (String, Collection) => IO[Unit])(implicit F: ConcurrentEffect[IO]): IO[ExitCode] = {
     val ec = scala.concurrent.ExecutionContext.global
 
     (for {
