@@ -6,14 +6,15 @@ import monix.execution.Scheduler
 import monix.execution.atomic.Atomic
 import org.slf4j.LoggerFactory
 
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 
 class IoLogger extends DefaultFunctorTell[IO, String] {
   private val logger      = LoggerFactory.getLogger("io-logger")
-  private val pendingLogs = Atomic(List.empty[String])
+  private val pendingLogs = Atomic(new ArrayBuffer[String](1000))
 
-  Scheduler.singleThread(name = "io-logger-thread").scheduleWithFixedDelay(0.seconds, 1.second) {
-    val logs = pendingLogs.getAndSet(List.empty)
+  Scheduler.fixedPool(name = "io-logger", poolSize = 1).scheduleWithFixedDelay(0.seconds, 1.second) {
+    val logs = pendingLogs.getAndSet(new ArrayBuffer[String](1000))
     logs.foreach { msg =>
       logger.info(msg)
     }
