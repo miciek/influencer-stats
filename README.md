@@ -73,7 +73,7 @@ cd async-profiler
 
 Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
-### Version 1 (akka-http server/client + Futures)
+### Version 1 (log-all/list-state/akka-http)
 ```
 > wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
 Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats

@@ -1,18 +1,18 @@
 package com.michalplachta.influencerstats
 
 import akka.actor.ActorSystem
+import cats.Monad
 import cats.effect.IO
 import cats.implicits._
-import cats.mtl.{DefaultFunctorTell, FunctorTell}
-import cats.{Functor, Monad}
+import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.api._
 import com.michalplachta.influencerstats.api.youtube.VideoListResponse
 import com.michalplachta.influencerstats.clients.AkkaHttpClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.{InfluencerItem, InfluencerResults}
+import com.michalplachta.influencerstats.logging.IoLogger
 import com.michalplachta.influencerstats.state.InMemListState
 import com.typesafe.config.ConfigFactory
-import org.slf4j.LoggerFactory
 
 object Main extends App {
   val config        = ConfigFactory.load()
@@ -40,19 +40,10 @@ object Main extends App {
     } yield Statistics.calculate(items)
   }
 
-  implicit def ioLogger: FunctorTell[IO, String] = new DefaultFunctorTell[IO, String] {
-    private val logger = LoggerFactory.getLogger("io-logger")
+  implicit val system: ActorSystem              = ActorSystem("influencer-stats")
+  implicit val logging: FunctorTell[IO, String] = new IoLogger
 
-    override val functor = Functor[IO]
-    override def tell(msg: String) = {
-      IO {
-        logger.info(msg)
-      }
-    }
-  }
-
-  implicit val system: ActorSystem = ActorSystem("influencer-stats")
-  val state                        = new InMemListState[IO]
+  val state = new InMemListState[IO]
 
   (1 to 10000).map(id => (id.toString, Collection(List.empty))).foreach {
     case (id, collection) =>
