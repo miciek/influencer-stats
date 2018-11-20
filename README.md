@@ -91,22 +91,22 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
   Transfer/sec:      1.17KB
 ```
 
-### Version 2 (akka-http/Hammock + IO)
+### Version 2 (logs-max-1kps/list-state/akka-http)
 ```
-> wrk -t1 -c1 -d60s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-Running 1m test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  1 threads and 1 connections
+> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  1 threads and 16 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     1.66ms  595.48us  30.56ms   95.45%
-    Req/Sec   610.99     42.68   696.00     77.67%
+    Latency   261.43ms   97.92ms 760.70ms   70.47%
+    Req/Sec    61.60     26.42   150.00     68.60%
   Latency Distribution
-     50%    1.58ms
-     75%    1.66ms
-     90%    1.82ms
-     99%    2.83ms
-  36501 requests in 1.00m, 6.61MB read
-Requests/sec:    608.10
-Transfer/sec:    112.83KB
+     50%  256.15ms
+     75%  317.90ms
+     90%  389.43ms
+     99%  551.64ms
+  1832 requests in 30.01s, 339.92KB read
+Requests/sec:     61.05
+Transfer/sec:     11.33KB
 ```
 
 ### Version 3 (http4s/Hammock + IO)
