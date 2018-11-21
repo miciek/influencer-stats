@@ -25,20 +25,21 @@ To run performance tests, you will need [wrk](https://github.com/wg/wrk). To ana
 Before starting, let's first establish the performance of our YouTube mock server:
 
 ```
-> wrk -t1 -c1 -d30s --latency http://localhost:8081/youtube/v3/videos
-Running 30s test @ http://localhost:8081/youtube/v3/videos
-  1 threads and 1 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   591.88us  689.01us  29.57ms   95.23%
-    Req/Sec     1.87k   295.13     2.32k    79.33%
-  Latency Distribution
-     50%  471.00us
-     75%  548.00us
-     90%  756.00us
-     99%    2.53ms
-  55956 requests in 30.00s, 41.51MB read
-Requests/sec:   1865.16
-Transfer/sec:      1.38MB
+> wrk -t2 -c256 -d30s --latency http://localhost:8081/youtube/v3/videos
+  Running 30s test @ http://localhost:8081/youtube/v3/videos
+    2 threads and 256 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency    11.86ms    2.10ms  44.67ms   95.00%
+      Req/Sec    10.87k   614.63    12.14k    79.17%
+    Latency Distribution
+       50%   11.72ms
+       75%   11.98ms
+       90%   12.36ms
+       99%   23.59ms
+    649268 requests in 30.01s, 486.65MB read
+    Socket errors: connect 0, read 124, write 0, timeout 0
+  Requests/sec:  21634.72
+  Transfer/sec:     16.22MB
 ```
 
 Additionally, let's see what is the performance of collections with no videos (no additional requests to YouTube server are made):
@@ -165,18 +166,18 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
 ### Version 6 (logs-max-1kps-array/triemap-state/http4s/hammock)
 ```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
   Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
     1 threads and 16 connections
     Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency    18.96ms   17.91ms 318.95ms   98.63%
-      Req/Sec     0.92k    98.26     1.08k    81.88%
+      Latency     4.66ms    1.45ms  26.27ms   75.16%
+      Req/Sec     3.45k   276.16     3.91k    64.33%
     Latency Distribution
-       50%   16.97ms
-       75%   20.00ms
-       90%   23.59ms
-       99%   47.79ms
-    27264 requests in 30.03s, 4.26MB read
-  Requests/sec:    907.98
-  Transfer/sec:    145.42KB
+       50%    4.49ms
+       75%    5.36ms
+       90%    6.33ms
+       99%    9.19ms
+    103117 requests in 30.01s, 16.13MB read
+  Requests/sec:   3436.23
+  Transfer/sec:    550.33KB
 ```
