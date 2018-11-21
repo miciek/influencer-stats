@@ -162,3 +162,21 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
   Requests/sec:   1320.96
   Transfer/sec:    211.56KB
 ```
+
+### Version 6 (logs-max-1kps-array/triemap-state/http4s/hammock)
+```
+> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency    18.96ms   17.91ms 318.95ms   98.63%
+      Req/Sec     0.92k    98.26     1.08k    81.88%
+    Latency Distribution
+       50%   16.97ms
+       75%   20.00ms
+       90%   23.59ms
+       99%   47.79ms
+    27264 requests in 30.03s, 4.26MB read
+  Requests/sec:    907.98
+  Transfer/sec:    145.42KB
+```

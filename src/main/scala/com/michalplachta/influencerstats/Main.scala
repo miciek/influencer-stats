@@ -3,7 +3,7 @@ package com.michalplachta.influencerstats
 import cats.effect.{IO, IOApp}
 import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.api._
-import com.michalplachta.influencerstats.clients.Http4sClient
+import com.michalplachta.influencerstats.clients.HammockClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
@@ -31,10 +31,10 @@ object Main extends IOApp {
       .http4sServer(
         host,
         port,
-        client =>
+        _ =>
           Statistics.getInfluencerResults(
             state.fetchCollection,
-            Http4sClient.getVideoListResponse(client, youtubeUri, youtubeApiKey)
+            HammockClient.getVideoListResponse(youtubeUri, youtubeApiKey)
         ),
         state.fetchCollection,
         state.saveCollection
