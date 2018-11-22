@@ -2,7 +2,7 @@ package com.michalplachta.influencerstats
 
 import cats.effect.IO
 import cats.mtl.FunctorTell
-import com.michalplachta.influencerstats.clients.HammockClient
+import com.michalplachta.influencerstats.client.{HammockVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
@@ -19,6 +19,7 @@ object Main extends App {
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
   implicit val server: Server[IO]               = new Http4sServer
+  implicit val client: VideoClient[IO]          = new HammockVideoClient(youtubeUri, youtubeApiKey)
   implicit val logging: FunctorTell[IO, String] = new IoLogger
 
   val state = new InMemMapState[IO]
@@ -33,8 +34,7 @@ object Main extends App {
       host,
       port,
       Statistics.getInfluencerResults(
-        state.fetchCollection,
-        HammockClient.getVideoListResponse(youtubeUri, youtubeApiKey)
+        state.fetchCollection
       ),
       state.fetchCollection,
       state.saveCollection

@@ -1,4 +1,4 @@
-package com.michalplachta.influencerstats.api
+package com.michalplachta.influencerstats.client
 
 object youtube {
   final case class VideoListResponse(items: List[Video])
