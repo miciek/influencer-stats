@@ -1,16 +1,18 @@
-package com.michalplachta.influencerstats.api
-
+package com.michalplachta.influencerstats.server.akkahttp
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.{HttpApp, Route}
-import cats.effect._
+import cats.effect.IO
 import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
+import com.michalplachta.influencerstats.server.Server
 
-object AkkaHttpServer {
-  def akkaHttpServer(host: String,
-                     port: Int,
-                     getResults: String => IO[InfluencerResults],
-                     getCollection: String => IO[Option[Collection]],
-                     saveCollection: (String, Collection) => IO[Unit])(implicit system: ActorSystem): IO[Unit] = IO {
+class AkkaHttpServer extends Server[IO] {
+  private val system: ActorSystem = ActorSystem("akka-http-server")
+
+  def serve(host: String,
+            port: Int,
+            getResults: String => IO[InfluencerResults],
+            getCollection: String => IO[Option[Collection]],
+            saveCollection: (String, Collection) => IO[Unit]): IO[Unit] = IO {
     val httpApp = new HttpApp {
       override protected def routes: Route =
         Route.seal(

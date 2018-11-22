@@ -1,4 +1,4 @@
-package com.michalplachta.influencerstats.api
+package com.michalplachta.influencerstats.server.http4s
 
 import cats.effect._
 import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}

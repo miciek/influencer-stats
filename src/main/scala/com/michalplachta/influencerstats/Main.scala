@@ -1,22 +1,24 @@
 package com.michalplachta.influencerstats
 
-import cats.effect.{IO, IOApp}
+import cats.effect.IO
 import cats.mtl.FunctorTell
-import com.michalplachta.influencerstats.api._
 import com.michalplachta.influencerstats.clients.HammockClient
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
+import com.michalplachta.influencerstats.server.Server
+import com.michalplachta.influencerstats.server.http4s.Http4sServer
 import com.michalplachta.influencerstats.state.InMemMapState
 import com.typesafe.config.ConfigFactory
 
-object Main extends IOApp {
+object Main extends App {
   val config        = ConfigFactory.load()
   val host          = config.getString("app.host")
   val port          = config.getInt("app.port")
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
+  implicit val server: Server[IO]               = new Http4sServer
   implicit val logging: FunctorTell[IO, String] = new IoLogger
 
   val state = new InMemMapState[IO]
@@ -26,18 +28,16 @@ object Main extends IOApp {
       state.saveCollection(id, collection).unsafeRunSync()
   }
 
-  override def run(args: List[String]) = {
-    Http4sServer
-      .http4sServer(
-        host,
-        port,
-        _ =>
-          Statistics.getInfluencerResults(
-            state.fetchCollection,
-            HammockClient.getVideoListResponse(youtubeUri, youtubeApiKey)
-        ),
+  Server[IO]
+    .serve(
+      host,
+      port,
+      Statistics.getInfluencerResults(
         state.fetchCollection,
-        state.saveCollection
-      )
-  }
+        HammockClient.getVideoListResponse(youtubeUri, youtubeApiKey)
+      ),
+      state.fetchCollection,
+      state.saveCollection
+    )
+    .unsafeRunSync()
 }

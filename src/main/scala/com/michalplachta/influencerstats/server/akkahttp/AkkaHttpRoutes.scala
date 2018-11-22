@@ -1,13 +1,13 @@
-package com.michalplachta.influencerstats.api
+package com.michalplachta.influencerstats.server.akkahttp
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directives, Route}
 import cats.effect.IO
 import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
 
-object AkkaHttpRoutes extends Directives {
+object AkkaHttpRoutes extends Directives with FailFastCirceSupport {
   def getInfluencerResults(getResults: String => IO[InfluencerResults]): Route = {
     path("collections" / Segment / "stats") { collectionId =>
       get {
