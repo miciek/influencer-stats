@@ -1,21 +1,17 @@
 package com.michalplachta.influencerstats.server.http4s
 
+import cats.Monad
 import cats.effect._
-import cats.effect.internals.IOContextShift
-import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
+import com.michalplachta.influencerstats.core.model.InfluencerResults
 import com.michalplachta.influencerstats.server.Server
+import com.michalplachta.influencerstats.state.CollectionsState
 import org.http4s.server.blaze.BlazeBuilder
 
-class Http4sServer extends Server[IO] {
-  def serve(host: String,
-            port: Int,
-            getResults: String => IO[InfluencerResults],
-            getCollection: String => IO[Option[Collection]],
-            saveCollection: (String, Collection) => IO[Unit]): IO[Unit] = {
-    implicit val contextShift: ContextShift[IO] = IOContextShift.global
+class Http4sServer[F[_]: Monad: Sync: ConcurrentEffect: CollectionsState] extends Server[F] {
+  def serve(host: String, port: Int, getResults: String => F[InfluencerResults]): F[Unit] = {
 
-    val service = new Http4sService(getResults, getCollection, saveCollection)
-    BlazeBuilder[IO]
+    val service = new Http4sService(getResults)
+    BlazeBuilder[F]
       .bindHttp(port, host)
       .mountService(service.routes, "/")
       .withNio2(isNio2 = true)

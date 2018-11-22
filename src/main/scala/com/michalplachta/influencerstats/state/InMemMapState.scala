@@ -7,8 +7,8 @@ import com.michalplachta.influencerstats.core.model.Collection
 
 import scala.collection.concurrent.TrieMap
 
-class InMemMapState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) {
-  val state = TrieMap.empty[String, Collection]
+class InMemMapState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) extends CollectionsState[F] {
+  private val state = TrieMap.empty[String, Collection]
 
   def fetchCollection(id: String): F[Option[Collection]] = {
     for {

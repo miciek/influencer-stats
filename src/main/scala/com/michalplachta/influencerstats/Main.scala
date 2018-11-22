@@ -1,6 +1,7 @@
 package com.michalplachta.influencerstats
 
-import cats.effect.IO
+import cats.effect.internals.IOContextShift
+import cats.effect.{ContextShift, IO}
 import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.client.{HammockVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
@@ -8,7 +9,7 @@ import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.IoLogger
 import com.michalplachta.influencerstats.server.Server
 import com.michalplachta.influencerstats.server.http4s.Http4sServer
-import com.michalplachta.influencerstats.state.InMemMapState
+import com.michalplachta.influencerstats.state.{CollectionsState, InMemMapState}
 import com.typesafe.config.ConfigFactory
 
 object Main extends App {
@@ -18,11 +19,11 @@ object Main extends App {
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
+  implicit val logging: FunctorTell[IO, String] = new IoLogger
+  implicit val contextShift: ContextShift[IO]   = IOContextShift.global
+  implicit val state: CollectionsState[IO]      = new InMemMapState[IO]
   implicit val server: Server[IO]               = new Http4sServer
   implicit val client: VideoClient[IO]          = new HammockVideoClient(youtubeUri, youtubeApiKey)
-  implicit val logging: FunctorTell[IO, String] = new IoLogger
-
-  val state = new InMemMapState[IO]
 
   (1 to 10000).map(id => (id.toString, Collection(List.empty))).foreach {
     case (id, collection) =>
@@ -35,9 +36,7 @@ object Main extends App {
       port,
       Statistics.getInfluencerResults(
         state.fetchCollection
-      ),
-      state.fetchCollection,
-      state.saveCollection
+      )
     )
     .unsafeRunSync()
 }

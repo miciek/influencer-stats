@@ -7,8 +7,8 @@ import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.core.model.Collection
 import monix.execution.atomic.Atomic
 
-class InMemListState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) {
-  val state = Atomic(List.empty[(String, Collection)])
+class InMemListState[F[_]: Monad: Async](implicit F: FunctorTell[F, String]) extends CollectionsState[F] {
+  private val state = Atomic(List.empty[(String, Collection)])
 
   def fetchCollection(id: String): F[Option[Collection]] = {
     def find(collections: List[(String, Collection)]): F[Option[Collection]] = {
