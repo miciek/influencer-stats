@@ -2,9 +2,9 @@ package com.michalplachta.influencerstats
 
 import cats.effect.internals.IOContextShift
 import cats.effect.{ContextShift, IO}
+import com.michalplachta.influencerstats.cache.StatisticsCaching
 import com.michalplachta.influencerstats.client.{HammockVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
-import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.{IoLogger, Logging}
 import com.michalplachta.influencerstats.server.Server
 import com.michalplachta.influencerstats.server.http4s.Http4sServer
@@ -20,16 +20,14 @@ object Main extends App {
 
   implicit val contextShift: ContextShift[IO] = IOContextShift.global
   implicit val logging: Logging[IO]           = new IoLogger
-  implicit val state: CollectionsState[IO]    = new InMemMapState[IO]
-  implicit val server: Server[IO]             = new Http4sServer
-  implicit val client: VideoClient[IO]        = new HammockVideoClient(youtubeUri, youtubeApiKey)
 
-  (1 to 10000).map(id => (id.toString, Collection(List.empty))).foreach {
-    case (id, collection) =>
-      state.saveCollection(id, collection).unsafeRunSync()
-  }
+  implicit val client: VideoClient[IO]     = new HammockVideoClient(youtubeUri, youtubeApiKey)
+  implicit val state: CollectionsState[IO] = new InMemMapState[IO]
+  implicit val server: Server[IO]          = new Http4sServer
+
+  val statisticsCaching = new StatisticsCaching(state.fetchAllCollectionIds, Statistics.getInfluencerResults[IO])
 
   Server[IO]
-    .serve(host, port, Statistics.getInfluencerResults[IO])
+    .serve(host, port, statisticsCaching.getCachedInfluencerResults)
     .unsafeRunSync()
 }

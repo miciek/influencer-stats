@@ -7,4 +7,6 @@ trait CollectionsState[F[_]] {
   def fetchCollection(id: String): F[Option[Collection]]
 
   def saveCollection(id: String, collection: Collection): F[Unit]
+
+  def fetchAllCollectionIds: F[List[String]]
 }
