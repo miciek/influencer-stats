@@ -11,7 +11,7 @@ class StatisticsCaching(fetchAllCollectionIds: IO[List[String]],
                         getInfluencerResults: String => IO[InfluencerResults]) {
   private val cache = TrieMap.empty[String, InfluencerResults]
 
-  Scheduler.fixedPool(name = "statistics-caching", poolSize = 2).scheduleWithFixedDelay(0.seconds, 3.seconds) {
+  Scheduler.fixedPool(name = "statistics-caching", poolSize = 1).scheduleWithFixedDelay(0.seconds, 10.seconds) {
     refreshCache.unsafeRunSync()
   }
 
