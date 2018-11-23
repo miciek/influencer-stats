@@ -74,23 +74,25 @@ cd async-profiler
 
 Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
 
-### Version 1 (log-all/list-state/akka-http)
+### Version 1 (DefaultLogger/InMemListState/AkkaHttpVideoClient/AkkaHttpServer)
 ```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
   Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
     1 threads and 16 connections
     Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency     2.46s   219.22ms   3.39s    76.32%
-      Req/Sec    14.35     12.33    59.00     71.58%
+      Latency    56.47ms    9.05ms 128.51ms   72.73%
+      Req/Sec   284.33     31.34   353.00     72.33%
     Latency Distribution
-       50%    2.40s
-       75%    2.55s
-       90%    2.85s
-       99%    3.35s
-    190 requests in 30.06s, 35.25KB read
-  Requests/sec:      6.32
-  Transfer/sec:      1.17KB
+       50%   56.03ms
+       75%   61.61ms
+       90%   66.89ms
+       99%   82.41ms
+    8510 requests in 30.06s, 1.54MB read
+  Requests/sec:    283.12
+  Transfer/sec:     52.53KB
 ```
+
+According to the [flamegraph](flamegraphs/v1.svg), the most performance can be gained from optimizing `DefaultLogger`, which took `70.29%` of CPU time.
 
 ### Version 2 (logs-max-1kps-list/list-state/akka-http)
 ```
