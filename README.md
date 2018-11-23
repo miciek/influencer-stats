@@ -4,7 +4,7 @@ This application gathers and aggregates stats for your influencer social media c
 
 ## Setup
 ### YouTube mock server
-You need YouTube mock server to be able to test performance without going over YouTube API limits. To build the image, run `docker build -t miciek/influencer-stats-youtube youtube`. To run it, execute `docker run -d --rm -p 8081:80 miciek/influencer-stats-youtube`.
+You need YouTube mock server to be able to test performance without going over YouTube API limits. To build the image, run `docker build -t miciek/influencer-stats-youtube youtube`. To run it, execute `docker run -d --rm --name youtube -p 8081:80 miciek/influencer-stats-youtube`.
 
 ### Running the application
 After executing `sbt run`, you need to configure the first `collection`:
@@ -69,7 +69,7 @@ To compare different versions, we will use [flamegraphs](http://www.brendangregg
 ```
 jps # to get the <PID> of the application
 cd async-profiler
-./profiler.sh -d 30 -f /tmp/flamegraph.svg <PID>
+./profiler.sh -d 15 -f /tmp/flamegraph.svg <PID>
 ```
 
 Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
@@ -180,4 +180,22 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
     103117 requests in 30.01s, 16.13MB read
   Requests/sec:   3436.23
   Transfer/sec:    550.33KB
+```
+
+### Version 7 (logs-max-1kps-array/triemap-state/http4s/hammock/caching)
+```
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency   453.00us    0.94ms  15.36ms   97.61%
+      Req/Sec    38.25k     3.57k   50.75k    83.67%
+    Latency Distribution
+       50%  319.00us
+       75%  398.00us
+       90%  485.00us
+       99%    5.77ms
+    1142285 requests in 30.01s, 178.66MB read
+  Requests/sec:  38062.91
+  Transfer/sec:      5.95MB
 ```
