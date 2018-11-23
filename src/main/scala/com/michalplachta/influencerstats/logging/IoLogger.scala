@@ -1,7 +1,5 @@
 package com.michalplachta.influencerstats.logging
-import cats.Functor
-import cats.effect.IO
-import cats.mtl.DefaultFunctorTell
+import cats.effect.Sync
 import monix.execution.Scheduler
 import monix.execution.atomic.Atomic
 import org.slf4j.LoggerFactory
@@ -9,7 +7,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 
-class IoLogger extends DefaultFunctorTell[IO, String] {
+class IoLogger[F[_]: Sync] extends Logging[F] {
   private val logger      = LoggerFactory.getLogger("io-logger")
   private val pendingLogs = Atomic(new ArrayBuffer[String](1000))
 
@@ -20,9 +18,8 @@ class IoLogger extends DefaultFunctorTell[IO, String] {
     }
   }
 
-  override val functor = Functor[IO]
-  override def tell(msg: String): IO[Unit] = {
-    IO {
+  def info(msg: String): F[Unit] = {
+    Sync[F].delay {
       pendingLogs.transform { logs =>
         if (logs.size < 1000) logs :+ msg
         else if (logs.size == 1000) logs :+ "Some logs were dropped, because the rate is higher than 1k/sec"

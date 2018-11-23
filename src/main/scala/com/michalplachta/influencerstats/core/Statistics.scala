@@ -1,9 +1,9 @@
 package com.michalplachta.influencerstats.core
 import cats.Monad
 import cats.implicits._
-import cats.mtl.FunctorTell
 import com.michalplachta.influencerstats.client.VideoClient
 import com.michalplachta.influencerstats.core.model._
+import com.michalplachta.influencerstats.logging.Logging
 
 object Statistics {
   def calculate(items: List[InfluencerItem]): InfluencerResults = {
@@ -16,22 +16,21 @@ object Statistics {
     }
   }
 
-  def getInfluencerResults[F[_]: Monad: VideoClient](
+  def getInfluencerResults[F[_]: Monad: VideoClient: Logging](
       fetchCollection: String => F[Option[Collection]]
-  )(id: String)(implicit F: FunctorTell[F, String]): F[InfluencerResults] = {
+  )(id: String): F[InfluencerResults] = {
     for {
-      _          <- F.tell(s"trying to fetch collection with id $id")
+      _          <- Logging[F].info(s"trying to fetch collection with id $id")
       collection <- fetchCollection(id)
-      _          <- F.tell(s"fetched collection: $collection")
+      _          <- Logging[F].info(s"fetched collection: $collection")
       videoIds   = collection.map(_.videos).getOrElse(List.empty)
-      _          <- F.tell(s"going to make ${videoIds.size} fetches")
+      _          <- Logging[F].info(s"going to make ${videoIds.size} fetches")
       responses  <- videoIds.map(VideoClient[F].fetchVideoListResponse).sequence
-      _          <- F.tell(s"got responses: $responses")
+      _          <- Logging[F].info(s"got responses: $responses")
       items = responses.flatMap(
         _.items.map(_.statistics).map(video => InfluencerItem(video.viewCount, video.likeCount, 0, 0))
       )
-      _ <- F.tell(s"got list of influencer items: $items")
+      _ <- Logging[F].info(s"got list of influencer items: $items")
     } yield calculate(items)
   }
-
 }
