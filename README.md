@@ -72,7 +72,7 @@ cd async-profiler
 ./profiler.sh -d 10 -f /tmp/flamegraph.svg <PID>
 ```
 
-Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
+Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory. Please view the flamegraphs as raw files in the browser, because only then they become interactive.
 
 ### Version 1 (DefaultLogger/InMemListState/AkkaHttpVideoClient/AkkaHttpServer)
 ```
@@ -91,6 +91,8 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory.
   Requests/sec:    283.12
   Transfer/sec:     52.53KB
 ```
+
+![Version 1 Flamegraph](flamegraphs/v1.svg)
 
 According to the [flamegraph](flamegraphs/v1.svg), the most performance can be gained from optimizing `DefaultLogger`, which took `70.29%` of CPU time.
 
