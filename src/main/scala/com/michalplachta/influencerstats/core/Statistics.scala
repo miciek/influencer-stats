@@ -4,6 +4,7 @@ import cats.implicits._
 import com.michalplachta.influencerstats.client.VideoClient
 import com.michalplachta.influencerstats.core.model._
 import com.michalplachta.influencerstats.logging.Logging
+import com.michalplachta.influencerstats.state.CollectionsState
 
 object Statistics {
   def calculate(items: List[InfluencerItem]): InfluencerResults = {
@@ -16,12 +17,10 @@ object Statistics {
     }
   }
 
-  def getInfluencerResults[F[_]: Monad: VideoClient: Logging](
-      fetchCollection: String => F[Option[Collection]]
-  )(id: String): F[InfluencerResults] = {
+  def getInfluencerResults[F[_]: Monad: VideoClient: CollectionsState: Logging](id: String): F[InfluencerResults] = {
     for {
       _          <- Logging[F].info(s"trying to fetch collection with id $id")
-      collection <- fetchCollection(id)
+      collection <- CollectionsState[F].fetchCollection(id)
       _          <- Logging[F].info(s"fetched collection: $collection")
       videoIds   = collection.map(_.videos).getOrElse(List.empty)
       _          <- Logging[F].info(s"going to make ${videoIds.size} fetches")

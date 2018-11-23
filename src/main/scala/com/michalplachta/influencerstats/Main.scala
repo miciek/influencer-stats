@@ -30,12 +30,6 @@ object Main extends App {
   }
 
   Server[IO]
-    .serve(
-      host,
-      port,
-      Statistics.getInfluencerResults(
-        state.fetchCollection
-      )
-    )
+    .serve(host, port, Statistics.getInfluencerResults[IO])
     .unsafeRunSync()
 }
