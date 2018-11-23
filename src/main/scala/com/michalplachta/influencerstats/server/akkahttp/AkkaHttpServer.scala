@@ -6,8 +6,7 @@ import com.michalplachta.influencerstats.core.model.InfluencerResults
 import com.michalplachta.influencerstats.server.Server
 import com.michalplachta.influencerstats.state.CollectionsState
 
-class AkkaHttpServer(implicit state: CollectionsState[IO]) extends Server[IO] {
-  private val system: ActorSystem = ActorSystem("akka-http-server")
+class AkkaHttpServer(implicit state: CollectionsState[IO], system: ActorSystem) extends Server[IO] {
 
   def serve(host: String, port: Int, getResults: String => IO[InfluencerResults]): IO[Unit] = IO {
     val httpApp = new HttpApp {
