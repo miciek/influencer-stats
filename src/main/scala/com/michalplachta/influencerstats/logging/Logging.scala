@@ -3,5 +3,5 @@ import simulacrum.typeclass
 
 @typeclass
 trait Logging[F[_]] {
-  def info(msg: String): F[Unit]
+  def debug(msg: String): F[Unit]
 }

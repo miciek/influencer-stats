@@ -14,11 +14,11 @@ class IoLogger[F[_]: Sync] extends Logging[F] {
   Scheduler.fixedPool(name = "io-logger", poolSize = 1).scheduleWithFixedDelay(0.seconds, 1.second) {
     val logs = pendingLogs.getAndSet(new ArrayBuffer[String](1000))
     logs.foreach { msg =>
-      logger.info(msg)
+      logger.debug(msg)
     }
   }
 
-  def info(msg: String): F[Unit] = {
+  def debug(msg: String): F[Unit] = {
     Sync[F].delay {
       pendingLogs.transform { logs =>
         if (logs.size < 1000) logs :+ msg

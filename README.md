@@ -203,3 +203,23 @@ According to the [flamegraph](flamegraphs/v1.svg), the most performance can be g
   Requests/sec:  39577.29
   Transfer/sec:      5.70MB
 ```
+
+### Version 1 with real YouTube server
+I run the first version (the worst performant one) with real YouTube API and here are the results. We can compare them to get a network overhead:
+```
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency   393.60ms  173.80ms   1.24s    85.57%
+      Req/Sec    44.59     24.01   125.00     57.66%
+    Latency Distribution
+       50%  362.83ms
+       75%  419.28ms
+       90%  579.63ms
+       99%    1.09s
+    1239 requests in 30.04s, 219.00KB read
+    Socket errors: connect 0, read 0, write 0, timeout 1
+  Requests/sec:     41.25
+  Transfer/sec:      7.29KB
+```
