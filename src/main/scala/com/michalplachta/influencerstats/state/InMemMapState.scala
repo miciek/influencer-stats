@@ -15,14 +15,14 @@ class InMemMapState[F[_]: Monad: Sync: Logging]
 
   def fetchCollection(id: String): F[Option[Collection]] = {
     for {
-      _      <- Logging[F].debug(s"looking for collection with id $id")
+      _      <- Logging[F].info(s"looking for collection with id $id")
       result <- Sync[F].delay(state.get(id))
     } yield result
   }
 
   def saveCollection(id: String, collection: Collection): F[Unit] = {
     for {
-      _ <- Logging[F].debug(s"saving collection $collection under id $id")
+      _ <- Logging[F].info(s"saving collection $collection under id $id")
       _ <- Sync[F].delay(state.put(id, collection))
     } yield ()
   }

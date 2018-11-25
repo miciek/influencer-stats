@@ -24,15 +24,15 @@ object Statistics {
 
   def getInfluencerResults[F[_]: Monad: CollectionView: VideoClient: Logging](id: String): F[InfluencerResults] = {
     for {
-      _          <- Logging[F].debug(s"trying to fetch collection with id $id")
+      _          <- Logging[F].info(s"trying to fetch collection with id $id")
       collection <- CollectionView[F].fetchCollection(id)
-      _          <- Logging[F].debug(s"fetched collection: $collection")
+      _          <- Logging[F].info(s"fetched collection: $collection")
       videoIds   = collection.map(_.videos).getOrElse(List.empty)
-      _          <- Logging[F].debug(s"going to make ${videoIds.size} fetches")
+      _          <- Logging[F].info(s"going to make ${videoIds.size} fetches")
       responses  <- videoIds.map(VideoClient[F].fetchVideoListResponse).sequence
-      _          <- Logging[F].debug(s"got responses: $responses")
+      _          <- Logging[F].info(s"got responses: $responses")
       items      = responses.flatMap(responseToItems)
-      _          <- Logging[F].debug(s"got list of influencer items: $items")
+      _          <- Logging[F].info(s"got list of influencer items: $items")
     } yield calculate(items)
   }
 }

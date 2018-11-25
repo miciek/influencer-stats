@@ -92,117 +92,95 @@ Generated flamegraphs are stored in [flamegraphs](./flamegraphs) directory. Plea
   Transfer/sec:     52.53KB
 ```
 
-![Version 1 Flamegraph](flamegraphs/v1.svg)
+![Version 1 Flame Graph](flamegraphs/v1.svg)
 
-According to the [flamegraph](flamegraphs/v1.svg), the most performance can be gained from optimizing `DefaultLogger`, which took `70.29%` of CPU time.
+According to the [flame graph](flamegraphs/v1.svg), the most performance can be gained from optimizing `DefaultLogger`, which took `70.29%` of CPU time.
 
-### Version 2 (logs-max-1kps-list/list-state/akka-http)
-```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-    1 threads and 16 connections
-    Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency   261.43ms   97.92ms 760.70ms   70.47%
-      Req/Sec    61.60     26.42   150.00     68.60%
-    Latency Distribution
-       50%  256.15ms
-       75%  317.90ms
-       90%  389.43ms
-       99%  551.64ms
-    1832 requests in 30.01s, 339.92KB read
-  Requests/sec:     61.05
-  Transfer/sec:     11.33KB
-```
-
-### Version 3 (logs-max-1kps-array/list-state/akka-http)
-```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-    1 threads and 16 connections
-    Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency    51.43ms   17.43ms 239.30ms   77.16%
-      Req/Sec   314.13     54.35   424.00     71.91%
-    Latency Distribution
-       50%   47.92ms
-       75%   58.89ms
-       90%   72.63ms
-       99%  111.66ms
-    9406 requests in 30.08s, 1.70MB read
-  Requests/sec:    312.72
-  Transfer/sec:     58.02KB
-```
-
-### Version 4 (logs-max-1kps-array/triemap-state/akka-http)
-```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-    1 threads and 16 connections
-    Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency    13.98ms   13.24ms 152.48ms   92.64%
-      Req/Sec     1.35k   324.33     1.85k    75.25%
-    Latency Distribution
-       50%   10.44ms
-       75%   12.79ms
-       90%   19.87ms
-       99%   86.41ms
-    40329 requests in 30.02s, 7.31MB read
-  Requests/sec:   1343.54
-  Transfer/sec:    249.29KB
-```
-
-### Version 5 (logs-max-1kps-array/triemap-state/http4s)
-```
-> wrk -t1 -c16 -d30s --timeout 10s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
-    1 threads and 16 connections
-    Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency    30.36ms  103.88ms   1.01s    96.19%
-      Req/Sec     1.39k   242.95     1.71k    87.41%
-    Latency Distribution
-       50%   11.01ms
-       75%   12.66ms
-       90%   16.42ms
-       99%  696.71ms
-    39701 requests in 30.05s, 6.21MB read
-  Requests/sec:   1320.96
-  Transfer/sec:    211.56KB
-```
-
-### Version 6 (logs-max-1kps-array/triemap-state/http4s/hammock)
+### Version 2 (DroppingLogger/InMemListState/AkkaHttpVideoClient/AkkaHttpServer)
 ```
 > wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
   Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
     1 threads and 16 connections
     Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency     4.66ms    1.45ms  26.27ms   75.16%
-      Req/Sec     3.45k   276.16     3.91k    64.33%
+      Latency     6.94ms   10.49ms 151.46ms   95.37%
+      Req/Sec     3.00k   565.78     3.79k    82.00%
     Latency Distribution
-       50%    4.49ms
-       75%    5.36ms
-       90%    6.33ms
-       99%    9.19ms
-    103117 requests in 30.01s, 16.13MB read
-  Requests/sec:   3436.23
-  Transfer/sec:    550.33KB
+       50%    4.67ms
+       75%    5.47ms
+       90%    9.61ms
+       99%   62.53ms
+    89757 requests in 30.06s, 16.26MB read
+  Requests/sec:   2986.26
+  Transfer/sec:    554.09KB
 ```
 
-### Version 7 (logs-max-1kps-array/triemap-state/http4s/hammock/caching)
+![Version 2 Flame Graph](flamegraphs/v2.svg)
+
+According to the [flame graph](flamegraphs/v2.svg), the most performance can be gained from optimizing `fetchVideoListResponse`, which took `19.92%` of CPU time.
+
+### Version 3 (DroppingLogger/InMemListState/HammockVideoClient/AkkaHttpServer)
 ```
 > wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
   Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
     1 threads and 16 connections
     Thread Stats   Avg      Stdev     Max   +/- Stdev
-      Latency   561.79us    1.42ms  16.02ms   96.54%
-      Req/Sec    39.79k     3.24k   45.45k    72.00%
+      Latency     5.06ms    2.44ms  26.40ms   74.12%
+      Req/Sec     3.24k   285.48     3.72k    62.00%
     Latency Distribution
-       50%  310.00us
-       75%  388.00us
-       90%  468.00us
-       99%    9.31ms
-    1187838 requests in 30.01s, 171.05MB read
-  Requests/sec:  39577.29
-  Transfer/sec:      5.70MB
+       50%    4.55ms
+       75%    6.22ms
+       90%    8.25ms
+       99%   13.05ms
+    96564 requests in 30.00s, 17.50MB read
+  Requests/sec:   3218.48
+  Transfer/sec:    597.18KB
 ```
+
+![Version 3 Flame Graph](flamegraphs/v3.svg)
+
+According to the [flame graph](flamegraphs/v3.svg), the most performance can be gained from optimizing `hammock/jvm/Interpreter`, which took `54.98%` of CPU time.
+
+### Version 4 (DroppingLogger/InMemListState/HammockVideoClient/AkkaHttpServer/StatisticsCaching)
+```
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency     2.87ms   11.63ms 144.63ms   94.76%
+      Req/Sec    31.59k     7.02k   39.26k    84.35%
+    Latency Distribution
+       50%  346.00us
+       75%  439.00us
+       90%    1.74ms
+       99%   62.86ms
+    933303 requests in 30.03s, 169.11MB read
+  Requests/sec:  31081.81
+  Transfer/sec:      5.63MB
+```
+
+![Version 4 Flame Graph](flamegraphs/v4.svg)
+
+According to the [flame graph](flamegraphs/v4.svg), the most performance can be gained from optimizing the server which takes all the CPU time.
+
+### Version 5 (DroppingLogger/InMemListState/HammockVideoClient/Http4sServer/StatisticsCaching)
+```
+> wrk -t1 -c16 -d30s --latency http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+  Running 30s test @ http://localhost:8080/collections/99757a95-f758-499f-a170-bea93b2d8bcf/stats
+    1 threads and 16 connections
+    Thread Stats   Avg      Stdev     Max   +/- Stdev
+      Latency   555.80us    1.38ms  17.53ms   96.68%
+      Req/Sec    38.79k     3.46k   48.66k    68.67%
+    Latency Distribution
+       50%  314.00us
+       75%  396.00us
+       90%  485.00us
+       99%    9.05ms
+    1158664 requests in 30.02s, 181.22MB read
+  Requests/sec:  38596.24
+  Transfer/sec:      6.04MB
+```
+
+![Version 5 Flame Graph](flamegraphs/v5.svg)
 
 ### Version 1 with real YouTube server
 I run the first version (the worst performant one) with real YouTube API and here are the results. We can compare them to get a network overhead:

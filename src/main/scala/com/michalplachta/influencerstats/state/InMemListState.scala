@@ -18,7 +18,7 @@ class InMemListState[F[_]: Monad: Sync: Logging]
       collections match {
         case x :: xs =>
           for {
-            _          <- Logging[F].debug(s"checking if $x is the collection we are looking for")
+            _          <- Logging[F].info(s"checking if $x is the collection we are looking for")
             collection <- if (x._1 == id) Sync[F].pure(Some(x._2)) else find(xs)
           } yield collection
         case Nil =>
@@ -27,16 +27,16 @@ class InMemListState[F[_]: Monad: Sync: Logging]
     }
 
     for {
-      _      <- Logging[F].debug(s"looking for collection with id $id")
+      _      <- Logging[F].info(s"looking for collection with id $id")
       result <- find(state.get)
     } yield result
   }
 
   def saveCollection(id: String, collection: Collection): F[Unit] = {
     for {
-      _ <- Logging[F].debug(s"saving collection $collection under id $id")
+      _ <- Logging[F].info(s"saving collection $collection under id $id")
       _ <- Sync[F].delay(state.transform(_ :+ ((id, collection))))
-      _ <- Logging[F].debug(s"state now contains ${state.get.size} collections")
+      _ <- Logging[F].info(s"state now contains ${state.get.size} collections")
     } yield ()
   }
 
