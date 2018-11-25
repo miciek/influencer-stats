@@ -57,27 +57,25 @@ object TypeclassIntro {
     println(showIfNonEmpty(List(1, 2, 3)))
   }
 
-  object effects {
-    // ESSENTIAL COMPLEXITY
-    def addInF[F[_]: Monad: Logging](fa: F[Int], fb: F[Int]): F[Int] = { // reduced degree of freedom
-      for {
-        a <- fa
-        b <- fb
-        _ <- Logging[F].info(s"adding $a and $b")
-      } yield a + b
-    } // this function can just flatMap and log - nothing more (don't have to look at implementation!)
+  // ESSENTIAL COMPLEXITY
+  def addInF[F[_]: Monad: Logging](fa: F[Int], fb: F[Int]): F[Int] = { // reduced degree of freedom
+    for {
+      a <- fa
+      b <- fb
+      _ <- Logging[F].info(s"adding $a and $b")
+    } yield a + b
+  } // this function can just flatMap and log - nothing more (don't have to look at implementation!)
 
-    // ACCIDENTAL COMPLEXITY
-    implicit val ioLogging     = new DefaultLogger[IO]
-    implicit val futureLogging = new FutureLogger
+  // ACCIDENTAL COMPLEXITY
+  implicit val ioLogging     = new DefaultLogger[IO]
+  implicit val futureLogging = new FutureLogger
 
-    val readInFuture: Future[Int] = Future(scala.io.StdIn.readInt()) // Future effect: starts on creation
-    val resultInFuture: Future[Int] = addInF(readInFuture, readInFuture)
-    println(Await.result(resultInFuture, 5.seconds))
+  val readInFuture: Future[Int]   = Future(scala.io.StdIn.readInt()) // Future effect: starts on creation
+  val resultInFuture: Future[Int] = addInF(readInFuture, readInFuture)
+  println(Await.result(resultInFuture, 5.seconds))
 
-    // REFERENTIAL TRANSPARENCY FTW!
-    val readInIO: IO[Int] = IO(scala.io.StdIn.readInt()) // IO effect: don't start on creation
-    val resultInIO: IO[Int] = addInF(readInIO, readInIO)
-    println(resultInIO.unsafeRunSync())
-  }
+  // REFERENTIAL TRANSPARENCY FTW!
+  val readInIO: IO[Int]   = IO(scala.io.StdIn.readInt()) // IO effect: don't start on creation
+  val resultInIO: IO[Int] = addInF(readInIO, readInIO)
+  println(resultInIO.unsafeRunSync())
 }
