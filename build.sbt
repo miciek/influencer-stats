@@ -29,12 +29,9 @@ lazy val root = (project in file("."))
     scalacOptions ++= List(
       "-unchecked",
       "-deprecation",
-      "-Ywarn-unused-import",
-      "-Xfatal-warnings",
       "-Ypartial-unification",
       "-language:higherKinds",
-      "-language:implicitConversions",
-      "-Xlint"
+      "-language:implicitConversions"
     ),
     mainClass in assembly := Some("com.michalplachta.influencerstats.Main"),
     scalafmtOnCompile := true,

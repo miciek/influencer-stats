@@ -3,11 +3,11 @@ package com.michalplachta.influencerstats
 import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
 import com.michalplachta.influencerstats.cache.StatisticsCaching
-import com.michalplachta.influencerstats.client.{HammockVideoClient, VideoClient}
+import com.michalplachta.influencerstats.client.{AkkaHttpVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
-import com.michalplachta.influencerstats.logging.{DroppingLogger, Logging}
+import com.michalplachta.influencerstats.logging.{DefaultLogger, Logging}
 import com.michalplachta.influencerstats.server.Server
-import com.michalplachta.influencerstats.server.http4s.Http4sServer
+import com.michalplachta.influencerstats.server.akkahttp.AkkaHttpServer
 import com.michalplachta.influencerstats.state._
 import com.typesafe.config.ConfigFactory
 
@@ -24,11 +24,11 @@ object Main extends App {
   implicit val cs: ContextShift[IO] = IO.contextShift(global)
   implicit val timer: Timer[IO]     = IO.timer(global)
 
-  implicit val logging: Logging[IO] = new DroppingLogger[IO]
+  implicit val logging: Logging[IO] = new DefaultLogger[IO]
   implicit val state: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
     new InMemListState
-  implicit val client: VideoClient[IO] = new HammockVideoClient(youtubeUri, youtubeApiKey)
-  implicit val server: Server[IO]      = new Http4sServer[IO]
+  implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
+  implicit val server: Server[IO]      = new AkkaHttpServer
 
   val statsCaching = new StatisticsCaching(Statistics.getInfluencerResults[IO])
 

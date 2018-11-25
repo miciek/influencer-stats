@@ -52,7 +52,7 @@ object TypeclassIntro {
       (list: List[A]) => list.toString
 
     implicit def lengthList[A]: Length[List[A]] =
-      (list: List[A]) => list.length
+      (list: List[A]) => list.size
 
     println(showIfNonEmpty(List(1, 2, 3)))
   }
@@ -71,13 +71,13 @@ object TypeclassIntro {
     implicit val ioLogging     = new DefaultLogger[IO]
     implicit val futureLogging = new FutureLogger
 
-    val randomInFuture: Future[Int] = Future(scala.io.StdIn.readInt()) // Future effect: starts on creation
-    val resultInFuture: Future[Int] = addInF(randomInFuture, randomInFuture)
+    val readInFuture: Future[Int] = Future(scala.io.StdIn.readInt()) // Future effect: starts on creation
+    val resultInFuture: Future[Int] = addInF(readInFuture, readInFuture)
     println(Await.result(resultInFuture, 5.seconds))
 
     // REFERENTIAL TRANSPARENCY FTW!
-    val randomInIO: IO[Int] = IO(scala.io.StdIn.readInt()) // IO effect: don't start on creation
-    val resultInIO: IO[Int] = addInF(randomInIO, randomInIO)
+    val readInIO: IO[Int] = IO(scala.io.StdIn.readInt()) // IO effect: don't start on creation
+    val resultInIO: IO[Int] = addInF(readInIO, readInIO)
     println(resultInIO.unsafeRunSync())
   }
 }
