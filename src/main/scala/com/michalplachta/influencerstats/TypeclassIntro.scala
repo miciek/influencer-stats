@@ -1,5 +1,13 @@
 package com.michalplachta.influencerstats
+import cats.Monad
+import cats.effect.IO
+import cats.implicits._
+import com.michalplachta.influencerstats.logging.{DefaultLogger, FutureLogger, Logging}
 import simulacrum.typeclass
+
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 object TypeclassIntro {
   object imperative {
@@ -47,5 +55,29 @@ object TypeclassIntro {
       (list: List[A]) => list.length
 
     println(showIfNonEmpty(List(1, 2, 3)))
+  }
+
+  object effects {
+    // ESSENTIAL COMPLEXITY
+    def addInF[F[_]: Monad: Logging](fa: F[Int], fb: F[Int]): F[Int] = { // reduced degree of freedom
+      for {
+        a <- fa
+        b <- fb
+        _ <- Logging[F].info(s"adding $a and $b")
+      } yield a + b
+    } // this function can just flatMap and log - nothing more (don't have to look at implementation!)
+
+    // ACCIDENTAL COMPLEXITY
+    implicit val ioLogging     = new DefaultLogger[IO]
+    implicit val futureLogging = new FutureLogger
+
+    val randomInFuture: Future[Int] = Future(scala.io.StdIn.readInt()) // Future effect: starts on creation
+    val resultInFuture: Future[Int] = addInF(randomInFuture, randomInFuture)
+    println(Await.result(resultInFuture, 5.seconds))
+
+    // REFERENTIAL TRANSPARENCY FTW!
+    val randomInIO: IO[Int] = IO(scala.io.StdIn.readInt()) // IO effect: don't start on creation
+    val resultInIO: IO[Int] = addInF(randomInIO, randomInIO)
+    println(resultInIO.unsafeRunSync())
   }
 }
