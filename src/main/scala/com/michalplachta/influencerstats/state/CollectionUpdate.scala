@@ -3,10 +3,6 @@ import com.michalplachta.influencerstats.core.model.Collection
 import simulacrum.typeclass
 
 @typeclass
-trait CollectionsState[F[_]] {
-  def fetchCollection(id: String): F[Option[Collection]]
-
+trait CollectionUpdate[F[_]] {
   def saveCollection(id: String, collection: Collection): F[Unit]
-
-  def fetchAllCollectionIds: F[List[String]]
 }

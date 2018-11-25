@@ -7,7 +7,10 @@ import com.michalplachta.influencerstats.core.model.Collection
 import com.michalplachta.influencerstats.logging.Logging
 import monix.execution.atomic.Atomic
 
-class InMemListState[F[_]: Monad: Sync: Logging] extends CollectionsState[F] {
+class InMemListState[F[_]: Monad: Sync: Logging]
+    extends CollectionView[F]
+    with CollectionUpdate[F]
+    with AllCollectionsView[F] {
   private val state = Atomic(List.empty[(String, Collection)])
 
   def fetchCollection(id: String): F[Option[Collection]] = {

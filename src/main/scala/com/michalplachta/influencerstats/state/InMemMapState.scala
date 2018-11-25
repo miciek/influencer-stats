@@ -7,7 +7,10 @@ import com.michalplachta.influencerstats.logging.Logging
 
 import scala.collection.concurrent.TrieMap
 
-class InMemMapState[F[_]: Monad: Sync: Logging] extends CollectionsState[F] {
+class InMemMapState[F[_]: Monad: Sync: Logging]
+    extends CollectionView[F]
+    with CollectionUpdate[F]
+    with AllCollectionsView[F] {
   private val state = TrieMap.empty[String, Collection]
 
   def fetchCollection(id: String): F[Option[Collection]] = {
