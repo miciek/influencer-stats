@@ -2,7 +2,6 @@ package com.michalplachta.influencerstats
 
 import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
-import com.michalplachta.influencerstats.cache.StatisticsCaching
 import com.michalplachta.influencerstats.client.{AkkaHttpVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
 import com.michalplachta.influencerstats.logging.{DefaultLogger, Logging}
@@ -30,9 +29,7 @@ object Main extends App {
   implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
   implicit val server: Server[IO]      = new AkkaHttpServer
 
-  val statsCaching = new StatisticsCaching(Statistics.getInfluencerResults[IO])
-
   Server[IO]
-    .serve(host, port, statsCaching.getCachedInfluencerResults)
+    .serve(host, port, Statistics.getInfluencerResults[IO])
     .unsafeRunSync()
 }
