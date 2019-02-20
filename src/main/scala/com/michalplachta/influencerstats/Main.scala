@@ -27,9 +27,9 @@ object Main extends App {
   implicit val state: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
     new InMemListState
   implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
-  implicit val server: Server[IO]      = new AkkaHttpServer
+  val server: Server[IO]               = new AkkaHttpServer
 
-  Server[IO]
+  server
     .serve(host, port, Statistics.getInfluencerResults[IO])
     .unsafeRunSync()
 }

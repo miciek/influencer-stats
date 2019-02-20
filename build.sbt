@@ -8,8 +8,8 @@ lazy val root = (project in file("."))
       "org.typelevel"        %% "cats-core"            % "1.4.+",
       "org.typelevel"        %% "cats-effect"          % "1.0.+",
       "org.typelevel"        %% "cats-mtl-core"        % "0.4.+",
-      "com.typesafe.akka"    %% "akka-http-core"       % "10.1.+",
-      "com.typesafe.akka"    %% "akka-http-spray-json" % "10.1.+",
+      "com.typesafe.akka"    %% "akka-http-core"       % "10.1.5",
+      "com.typesafe.akka"    %% "akka-http-spray-json" % "10.1.5",
       "org.http4s"           %% "http4s-dsl"           % "0.20.+",
       "org.http4s"           %% "http4s-blaze-server"  % "0.20.+",
       "org.http4s"           %% "http4s-blaze-client"  % "0.20.+",
@@ -23,7 +23,7 @@ lazy val root = (project in file("."))
       "io.monix"             %% "monix-execution"      % "2.3.+",
       "ch.qos.logback"       % "logback-classic"       % "1.2.+",
       "org.scalatest"        %% "scalatest"            % "3.0.+" % Test,
-      "com.typesafe.akka"    %% "akka-http-testkit"    % "10.1.+" % Test
+      "com.typesafe.akka"    %% "akka-http-testkit"    % "10.1.5" % Test
     ),
     scalaVersion := "2.12.7",
     scalacOptions ++= List(
@@ -34,8 +34,7 @@ lazy val root = (project in file("."))
       "-language:implicitConversions"
     ),
     mainClass in assembly := Some("com.michalplachta.influencerstats.Main"),
-    scalafmtOnCompile := true,
-    addCommandAlias("formatAll", ";sbt:scalafmt;test:scalafmt;compile:scalafmt"),
-    addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.6"),
+    addCompilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.9"),
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.2"),
     addCompilerPlugin("org.scalamacros" % "paradise"        % "2.1.0" cross CrossVersion.full)
   )
