@@ -13,8 +13,7 @@ object Statistics {
     items.foldLeft(CollectionStats.empty) { (results, item) =>
       CollectionStats(
         impressions = results.impressions + item.views,
-        engagements = results.engagements + item.comments +
-        item.likes + item.dislikes,
+        engagements = results.engagements + item.comments + item.likes + item.dislikes,
         score = results.engagements + item.likes
       )
     }
