@@ -30,6 +30,6 @@ object Main extends App {
   val server: Server[IO]               = new AkkaHttpServer
 
   server
-    .serve(host, port, Statistics.getInfluencerResults[IO])
+    .serve(host, port, Statistics.getStats[IO])
     .unsafeRunSync()
 }

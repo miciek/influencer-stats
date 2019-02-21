@@ -1,15 +1,15 @@
 package com.michalplachta.influencerstats.cache
 import cats.effect.IO
 import cats.implicits._
-import com.michalplachta.influencerstats.core.model.InfluencerResults
+import com.michalplachta.influencerstats.core.model.CollectionStats
 import com.michalplachta.influencerstats.state.AllCollectionsView
 import monix.execution.Scheduler
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 
-class StatisticsCaching(getInfluencerResults: String => IO[InfluencerResults])(implicit state: AllCollectionsView[IO]) {
-  private val cache = TrieMap.empty[String, InfluencerResults]
+class StatisticsCaching(getInfluencerResults: String => IO[CollectionStats])(implicit state: AllCollectionsView[IO]) {
+  private val cache = TrieMap.empty[String, CollectionStats]
 
   Scheduler.fixedPool(name = "statistics-caching", poolSize = 1).scheduleWithFixedDelay(0.seconds, 10.seconds) {
     refreshCache.unsafeRunSync()
@@ -28,9 +28,9 @@ class StatisticsCaching(getInfluencerResults: String => IO[InfluencerResults])(i
     } yield ()
   }
 
-  def getCachedInfluencerResults(id: String): IO[InfluencerResults] = {
+  def getCachedInfluencerResults(id: String): IO[CollectionStats] = {
     IO {
-      cache.getOrElse(id, InfluencerResults.empty)
+      cache.getOrElse(id, CollectionStats.empty)
     }
   }
 }

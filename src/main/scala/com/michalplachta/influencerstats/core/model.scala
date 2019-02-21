@@ -5,9 +5,9 @@ object model {
 
   final case class InfluencerItem(views: Int, likes: Int, dislikes: Int, comments: Int)
 
-  final case class InfluencerResults(impressions: Int, engagements: Int, score: Int)
+  final case class CollectionStats(impressions: Int, engagements: Int, score: Int)
 
-  object InfluencerResults {
-    def empty = InfluencerResults(0, 0, 0)
+  object CollectionStats {
+    def empty = CollectionStats(0, 0, 0)
   }
 }

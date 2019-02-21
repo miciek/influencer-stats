@@ -3,7 +3,7 @@ package com.michalplachta.influencerstats.server.http4s
 import cats.Monad
 import cats.effect.Sync
 import cats.implicits._
-import com.michalplachta.influencerstats.core.model.{Collection, InfluencerResults}
+import com.michalplachta.influencerstats.core.model.{Collection, CollectionStats}
 import com.michalplachta.influencerstats.state.{CollectionUpdate, CollectionView}
 import io.circe.generic.auto._
 import io.circe.{Decoder, Encoder}
@@ -11,7 +11,7 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes}
 
-class Http4sService[F[_]: Monad: Sync: CollectionView: CollectionUpdate](getResults: String => F[InfluencerResults])
+class Http4sService[F[_]: Monad: Sync: CollectionView: CollectionUpdate](getResults: String => F[CollectionStats])
     extends Http4sDsl[F] {
   implicit def jsonDecoder[A <: Product: Decoder]: EntityDecoder[F, A] = jsonOf[F, A]
   implicit def jsonEncoder[A <: Product: Encoder]: EntityEncoder[F, A] = jsonEncoderOf[F, A]
