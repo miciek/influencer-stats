@@ -23,7 +23,8 @@ lazy val root = (project in file("."))
       "io.monix"             %% "monix-execution"      % "2.3.+",
       "ch.qos.logback"       % "logback-classic"       % "1.2.+",
       "org.scalatest"        %% "scalatest"            % "3.0.+" % Test,
-      "com.typesafe.akka"    %% "akka-http-testkit"    % "10.1.5" % Test
+      "com.typesafe.akka"    %% "akka-http-testkit"    % "10.1.5" % Test,
+      "com.dimafeng"         %% "testcontainers-scala"    % "0.20.+" % Test
     ),
     scalaVersion := "2.12.7",
     scalacOptions ++= List(
