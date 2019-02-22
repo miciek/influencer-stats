@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import cats.effect.{ContextShift, IO, Timer}
 import com.michalplachta.influencerstats.client.{AkkaHttpVideoClient, VideoClient}
 import com.michalplachta.influencerstats.core.Statistics
-import com.michalplachta.influencerstats.logging.{DefaultLogger, Logging}
+import com.michalplachta.influencerstats.logging.{DefaultLogger, DroppingLogger, Logging}
 import com.michalplachta.influencerstats.server.Server
 import com.michalplachta.influencerstats.server.akkahttp.AkkaHttpServer
 import com.michalplachta.influencerstats.state._
@@ -27,9 +27,9 @@ object Main extends App {
   implicit val state: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
     new InMemListState
   implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
-  val server: Server[IO]               = new AkkaHttpServer
+  implicit val server: Server[IO]      = new AkkaHttpServer
 
-  server
+  Server[IO]
     .serve(host, port, Statistics.getStats[IO])
     .unsafeRunSync()
 }
