@@ -1,6 +1,6 @@
 # Influencer Stats
 
-This application gathers and aggregates stats for your influencer social media campaigns.
+This application gathers and aggregates stats for your influencer social media campaigns. This project is used in my presentation [Fast & Functional](https://speakerdeck.com/miciek/fast-and-functional-66b89d68-5d8c-4d2b-9bc2-5fa4adf16734).
 
 ## Setup
 ### YouTube mock server
