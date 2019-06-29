@@ -6,15 +6,13 @@ import cats.effect.IO
 import com.michalplachta.influencerstats.core.model.CollectionStats
 import com.michalplachta.influencerstats.state.{CollectionUpdate, CollectionView}
 
-class AkkaHttpServer(host: String, port: Int)(implicit system: ActorSystem,
-                                              collectionView: CollectionView[IO],
-                                              collectionUpdate: CollectionUpdate[IO]) {
+class AkkaHttpServer(host: String, port: Int)(implicit system: ActorSystem, collectionUpdate: CollectionUpdate[IO]) {
   def serve(getResults: String => IO[CollectionStats]): IO[Unit] = IO {
     val httpApp = new HttpApp {
       override protected def routes: Route =
         Route.seal(
           AkkaHttpRoutes.getInfluencerResults(getResults) ~
-          AkkaHttpRoutes.getCollection(collectionView.fetchCollection) ~
+          AkkaHttpRoutes.getCollection(???) ~
           AkkaHttpRoutes.putCollection(collectionUpdate.saveCollection)
         )
     }

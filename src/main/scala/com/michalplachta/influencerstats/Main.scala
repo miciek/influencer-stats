@@ -16,14 +16,4 @@ object Main extends App {
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
-  implicit val system: ActorSystem = ActorSystem("influencer-stats")
-
-  implicit val logging: Logging[IO]    = new DefaultLogger
-  implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
-  implicit val collections: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
-    new InMemListState
-
-  new AkkaHttpServer(host, port)
-    .serve(Statistics.getStats[IO])
-    .unsafeRunSync()
 }
