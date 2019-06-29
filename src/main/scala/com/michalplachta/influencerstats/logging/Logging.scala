@@ -1,4 +1,5 @@
 package com.michalplachta.influencerstats.logging
+
 import simulacrum.typeclass
 
 @typeclass

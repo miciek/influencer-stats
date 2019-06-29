@@ -1,16 +1,13 @@
 package com.michalplachta.influencerstats
 
 import akka.actor.ActorSystem
-import cats.effect.{ContextShift, IO, Timer}
-import com.michalplachta.influencerstats.client.{AkkaHttpVideoClient, VideoClient}
+import cats.effect.IO
+import com.michalplachta.influencerstats.client._
 import com.michalplachta.influencerstats.core.Statistics
-import com.michalplachta.influencerstats.logging.{DefaultLogger, DroppingLogger, Logging}
-import com.michalplachta.influencerstats.server.Server
+import com.michalplachta.influencerstats.logging._
 import com.michalplachta.influencerstats.server.akkahttp.AkkaHttpServer
 import com.michalplachta.influencerstats.state._
 import com.typesafe.config.ConfigFactory
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 object Main extends App {
   val config        = ConfigFactory.load()
@@ -19,17 +16,14 @@ object Main extends App {
   val youtubeUri    = config.getString("apis.youtubeUri")
   val youtubeApiKey = config.getString("apis.youtubeApiKey")
 
-  implicit val system: ActorSystem  = ActorSystem("influencer-stats")
-  implicit val cs: ContextShift[IO] = IO.contextShift(global)
-  implicit val timer: Timer[IO]     = IO.timer(global)
+  implicit val system: ActorSystem = ActorSystem("influencer-stats")
 
-  implicit val logging: Logging[IO] = new DefaultLogger[IO]
-  implicit val state: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
-    new InMemListState
+  implicit val logging: Logging[IO]    = new DefaultLogger
   implicit val client: VideoClient[IO] = new AkkaHttpVideoClient(youtubeUri, youtubeApiKey)
-  implicit val server: Server[IO]      = new AkkaHttpServer
+  implicit val collections: CollectionView[IO] with CollectionUpdate[IO] with AllCollectionsView[IO] =
+    new InMemListState
 
-  Server[IO]
-    .serve(host, port, Statistics.getStats[IO])
+  new AkkaHttpServer(host, port)
+    .serve(Statistics.getStats[IO])
     .unsafeRunSync()
 }

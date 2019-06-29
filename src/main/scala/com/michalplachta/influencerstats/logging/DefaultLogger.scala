@@ -1,12 +1,13 @@
 package com.michalplachta.influencerstats.logging
-import cats.effect.Sync
+
+import cats.effect.IO
 import org.slf4j.LoggerFactory
 
-class DefaultLogger[F[_]: Sync] extends Logging[F] {
+class DefaultLogger extends Logging[IO] {
   private val logger = LoggerFactory.getLogger("default-logger")
 
-  def info(msg: String): F[Unit] = {
-    Sync[F].delay {
+  def info(msg: String): IO[Unit] = {
+    IO {
       logger.info(msg)
     }
   }

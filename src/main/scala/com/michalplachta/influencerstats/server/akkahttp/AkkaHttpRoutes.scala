@@ -28,10 +28,10 @@ object AkkaHttpRoutes extends Directives with FailFastCirceSupport {
     }
   }
 
-  def getCollection(getCollection: String => IO[Option[Collection]]): Route = {
+  def getCollection(fetchCollection: String => IO[Option[Collection]]): Route = {
     path("collections" / Segment) { collectionId =>
       get {
-        onSuccess(getCollection(collectionId).unsafeToFuture) {
+        onSuccess(fetchCollection(collectionId).unsafeToFuture) {
           case Some(collection) =>
             complete((StatusCodes.OK, collection))
           case None =>

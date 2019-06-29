@@ -13,13 +13,13 @@ class InMemListState[F[_]: Monad: Sync: Logging]
     with AllCollectionsView[F] {
   private val state = Atomic(List.empty[(String, Collection)])
 
-  def fetchCollection(id: String): F[Option[Collection]] = {
+  def fetchCollection(collectionId: String): F[Option[Collection]] = {
     def find(collections: List[(String, Collection)]): F[Option[Collection]] = {
       collections match {
         case x :: xs =>
           for {
             _          <- Logging[F].info(s"checking if $x is the collection we are looking for")
-            collection <- if (x._1 == id) Sync[F].pure(Some(x._2)) else find(xs)
+            collection <- if (x._1 == collectionId) Sync[F].pure(Some(x._2)) else find(xs)
           } yield collection
         case Nil =>
           Sync[F].pure(None)
@@ -27,7 +27,7 @@ class InMemListState[F[_]: Monad: Sync: Logging]
     }
 
     for {
-      _      <- Logging[F].info(s"looking for collection with id $id")
+      _      <- Logging[F].info(s"looking for collection with id $collectionId")
       result <- find(state.get)
     } yield result
   }

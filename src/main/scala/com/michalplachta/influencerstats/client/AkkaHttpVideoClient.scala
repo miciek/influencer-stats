@@ -10,14 +10,14 @@ import com.michalplachta.influencerstats.client.youtube.VideoListResponse
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import io.circe.generic.auto._
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.ExecutionContext
 
 class AkkaHttpVideoClient(youtubeUri: String, youtubeApiKey: String)(implicit system: ActorSystem)
     extends VideoClient[IO] {
-  def fetchVideoListResponse(videoId: String): IO[VideoListResponse] = {
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-    implicit val ec: ExecutionContextExecutor    = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
+  implicit val ec: ExecutionContext            = system.dispatcher
 
+  def fetchVideoListResponse(videoId: String): IO[VideoListResponse] = {
     IO.fromFuture(IO {
       Http()
         .singleRequest(HttpRequest(uri = s"$youtubeUri?part=statistics&id=$videoId&key=$youtubeApiKey"))

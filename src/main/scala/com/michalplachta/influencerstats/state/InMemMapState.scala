@@ -1,4 +1,5 @@
 package com.michalplachta.influencerstats.state
+
 import cats.Monad
 import cats.effect.Sync
 import cats.implicits._
@@ -13,10 +14,10 @@ class InMemMapState[F[_]: Monad: Sync: Logging]
     with AllCollectionsView[F] {
   private val state = TrieMap.empty[String, Collection]
 
-  def fetchCollection(id: String): F[Option[Collection]] = {
+  def fetchCollection(collectionId: String): F[Option[Collection]] = {
     for {
-      _      <- Logging[F].info(s"looking for collection with id $id")
-      result <- Sync[F].delay(state.get(id))
+      _      <- Logging[F].info(s"looking for collection with id $collectionId")
+      result <- Sync[F].delay(state.get(collectionId))
     } yield result
   }
 

@@ -5,5 +5,5 @@ import simulacrum.typeclass
 
 @typeclass
 trait CollectionView[F[_]] {
-  def fetchCollection(id: String): F[Option[Collection]]
+  def fetchCollection(collectionId: String): F[Option[Collection]]
 }

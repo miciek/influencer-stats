@@ -1,4 +1,5 @@
 package com.michalplachta.influencerstats.cache
+
 import cats.effect.IO
 import cats.implicits._
 import com.michalplachta.influencerstats.core.model.CollectionStats
@@ -8,7 +9,9 @@ import monix.execution.Scheduler
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 
-class StatisticsCaching(getInfluencerResults: String => IO[CollectionStats])(implicit state: AllCollectionsView[IO]) {
+class StatisticsCaching(getInfluencerResults: String => IO[CollectionStats])(
+    implicit collections: AllCollectionsView[IO]
+) {
   private val cache = TrieMap.empty[String, CollectionStats]
 
   Scheduler.fixedPool(name = "statistics-caching", poolSize = 1).scheduleWithFixedDelay(0.seconds, 10.seconds) {
@@ -17,7 +20,7 @@ class StatisticsCaching(getInfluencerResults: String => IO[CollectionStats])(imp
 
   def refreshCache: IO[Unit] = {
     for {
-      ids <- state.fetchAllCollectionIds
+      ids <- collections.fetchAllCollectionIds
       _ <- ids.map { id =>
             getInfluencerResults(id).flatMap { influencerResults =>
               IO {

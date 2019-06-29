@@ -1,6 +1,6 @@
 package com.michalplachta.influencerstats.core
+
 import cats.Monad
-import cats.effect.IO
 import cats.implicits._
 import com.michalplachta.influencerstats.client.VideoClient
 import com.michalplachta.influencerstats.client.youtube.VideoListResponse
